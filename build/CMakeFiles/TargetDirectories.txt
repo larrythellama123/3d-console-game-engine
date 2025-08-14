@@ -1,0 +1,8 @@
+/home/rohit/Desktop/3d_game_engine/build/CMakeFiles/Engine3D.dir
+/home/rohit/Desktop/3d_game_engine/build/CMakeFiles/ExampleGame.dir
+/home/rohit/Desktop/3d_game_engine/build/CMakeFiles/edit_cache.dir
+/home/rohit/Desktop/3d_game_engine/build/CMakeFiles/rebuild_cache.dir
+/home/rohit/Desktop/3d_game_engine/build/CMakeFiles/list_install_components.dir
+/home/rohit/Desktop/3d_game_engine/build/CMakeFiles/install.dir
+/home/rohit/Desktop/3d_game_engine/build/CMakeFiles/install/local.dir
+/home/rohit/Desktop/3d_game_engine/build/CMakeFiles/install/strip.dir

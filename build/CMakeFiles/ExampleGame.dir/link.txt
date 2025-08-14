@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/ExampleGame.dir/src/Engine3D.cpp.o -o ExampleGame  libEngine3D.a -lncurses -ltinfo 

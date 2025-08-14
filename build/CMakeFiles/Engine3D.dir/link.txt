@@ -1,0 +1,2 @@
+/usr/bin/ar qc libEngine3D.a CMakeFiles/Engine3D.dir/src/EngineBackend.cpp.o
+/usr/bin/ranlib libEngine3D.a
