@@ -28,14 +28,7 @@ struct mesh{
 };
 
 struct projection{
-    float screen_width= 1000.0f;
-    float screen_height = 1000.0f;
-    float z_far = 1000.0f;
-    float z_near = 100.0f;
-    float f_fov = 90.0f;
-    float f_fov_rad = 1.0f /std::tan((f_fov/2)/180.0f * 3.14159f);
-    float aspect_ratio = screen_width/screen_height;
-    float q = z_far/(z_far - z_near);
+
     float matrix[4][4] = {0.0f};
 };
 
@@ -60,7 +53,7 @@ class EngineBackend{
 
         void ConstructProjectionMatrix();
 
-        void DrawTriangles(mesh mesh);
+        void DrawTriangle(float x0, float y0, float x1, float y1, float x2, float y2);
 
         void MultiplyMatrixVector(vec3D& i, vec3D& o, float m[][4]);
 
@@ -75,8 +68,15 @@ class EngineBackend{
     protected:
         int screen_width;
         int screen_height;
-        projection* proj; 
+        mat4x4* proj; 
         volatile sig_atomic_t program_interrupted = 0;
-        // char* screen_buffer;
-
+        float screen_widths= 1000.0f;
+        float screen_heights = 1000.0f;
+        float z_far = 1000.0f;
+        float z_near = 100.0f;
+        float f_fov = 90.0f;
+        float f_fov_rad = 1.0f /std::tan((f_fov/2)/180.0f * 3.14159f);
+        float aspect_ratio = static_cast<float>(screen_widths/screen_heights);
+        float q = z_far/(z_far - z_near);
+        float fElapsedTime;
 };

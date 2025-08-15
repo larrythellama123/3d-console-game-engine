@@ -56,20 +56,19 @@ class Engine3D: public EngineBackend{
             matRotX.m[2][1] = -sinf(fTheta * 0.5f);
             matRotX.m[2][2] = cosf(fTheta * 0.5f);
             matRotX.m[3][3] = 1;
-            DrawTriangles(meshCube);
             for (auto tri : meshCube.tris)
             {
                 triangle triProjected, triTranslated, triRotatedZ, triRotatedZX;
 
                 // Rotate in Z-Axis
-                MultiplyMatrixVector(tri.vertices[0], triRotatedZ.vertices[0], matRotZ);
-                MultiplyMatrixVector(tri.vertices[1], triRotatedZ.vertices[1], matRotZ);
-                MultiplyMatrixVector(tri.vertices[2], triRotatedZ.vertices[2], matRotZ);
+                MultiplyMatrixVector(tri.vertices[0], triRotatedZ.vertices[0], matRotZ.m);
+                MultiplyMatrixVector(tri.vertices[1], triRotatedZ.vertices[1], matRotZ.m);
+                MultiplyMatrixVector(tri.vertices[2], triRotatedZ.vertices[2], matRotZ.m);
 
                 // Rotate in X-Axis
-                MultiplyMatrixVector(triRotatedZ.vertices[0], triRotatedZX.vertices[0], matRotX);
-                MultiplyMatrixVector(triRotatedZ.vertices[1], triRotatedZX.vertices[1], matRotX);
-                MultiplyMatrixVector(triRotatedZ.vertices[2], triRotatedZX.vertices[2], matRotX);
+                MultiplyMatrixVector(triRotatedZ.vertices[0], triRotatedZX.vertices[0], matRotX.m );
+                MultiplyMatrixVector(triRotatedZ.vertices[1], triRotatedZX.vertices[1], matRotX.m);
+                MultiplyMatrixVector(triRotatedZ.vertices[2], triRotatedZX.vertices[2], matRotX.m);
 
                 // Offset into the screen
                 triTranslated = triRotatedZX;
@@ -78,31 +77,28 @@ class Engine3D: public EngineBackend{
                 triTranslated.vertices[2].z = triRotatedZX.vertices[2].z + 3.0f;
 
                 // Project triangles from 3D --> 2D
-                MultiplyMatrixVector(triTranslated.vertices[0], triProjected.vertices[0], matProj);
-                MultiplyMatrixVector(triTranslated.vertices[1], triProjected.vertices[1], matProj);
-                MultiplyMatrixVector(triTranslated.vertices[2], triProjected.vertices[2], matProj);
+                MultiplyMatrixVector(triTranslated.vertices[0], triProjected.vertices[0], proj->m);
+                MultiplyMatrixVector(triTranslated.vertices[1], triProjected.vertices[1], proj->m);
+                MultiplyMatrixVector(triTranslated.vertices[2], triProjected.vertices[2], proj->m);
 
                 // Scale into view
                 triProjected.vertices[0].x += 1.0f; triProjected.vertices[0].y += 1.0f;
                 triProjected.vertices[1].x += 1.0f; triProjected.vertices[1].y += 1.0f;
                 triProjected.vertices[2].x += 1.0f; triProjected.vertices[2].y += 1.0f;
-                triProjected.vertices[0].x *= 0.5f * (float)ScreenWidth();
-                triProjected.vertices[0].y *= 0.5f * (float)ScreenHeight();
-                triProjected.vertices[1].x *= 0.5f * (float)ScreenWidth();
-                triProjected.vertices[1].y *= 0.5f * (float)ScreenHeight();
-                triProjected.vertices[2].x *= 0.5f * (float)ScreenWidth();
-                triProjected.vertices[2].y *= 0.5f * (float)ScreenHeight();
+                triProjected.vertices[0].x *= 0.5f * (float)screen_width;
+                triProjected.vertices[0].y *= 0.5f * (float)screen_height;
+                triProjected.vertices[1].x *= 0.5f * (float)screen_width;
+                triProjected.vertices[1].y *= 0.5f * (float)screen_height;
+                triProjected.vertices[2].x *= 0.5f * (float)screen_width;
+                triProjected.vertices[2].y *= 0.5f * (float)screen_height;
 
                 // Rasterize triangle
                 DrawTriangle(triProjected.vertices[0].x, triProjected.vertices[0].y,
                     triProjected.vertices[1].x, triProjected.vertices[1].y,
-                    triProjected.vertices[2].x, triProjected.vertices[2].y,
-                    PIXEL_SOLID, FG_WHITE);
+                    triProjected.vertices[2].x, triProjected.vertices[2].y);
 
             }
-
-
-		return true;
+            clear();
             return true;
         }
 
@@ -111,7 +107,8 @@ class Engine3D: public EngineBackend{
     private:
         mesh meshCube;
         float fTheta;
-        mat4x4 
+
+
 };
 
 int main(){

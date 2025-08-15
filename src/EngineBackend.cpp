@@ -14,10 +14,7 @@ bool EngineBackend::ConstructConsole(){
             GetTerminalSize(width, height);
             screen_width = width;
             screen_height = height;
-            // screen_buffer = new char[screen_width*screen_height];
-            // memset(screen_buffer, 0, sizeof(char)*screen_height*screen_width);
-            ConstructProjectionMatrix();
-
+            ConstructProjectionMatrix();    
             return true;
         };
 
@@ -27,7 +24,19 @@ bool EngineBackend::ConstructConsole(){
 
         void EngineBackend::Start(){
             OnUserCreate();
-            OnUserUpdate();
+            auto start_time = std::chrono::steady_clock::now();
+            while(true){
+                auto end_time = std::chrono::steady_clock::now();
+                // auto elapsedTime = std::chrono::duration_cast<std::chrono::seconds>(end_time - start_time);
+                std::chrono::duration<float> elapsedTime = end_time - start_time;
+                start_time = end_time;
+                fElapsedTime = elapsedTime.count();
+                // std::chrono::duration<double>
+                // fElapsedTime = static_cast<float>(duration.count());   
+                // std::cout<<fElapsedTime;
+            
+                OnUserUpdate(fElapsedTime); 
+            }
         };
 
         bool EngineBackend::OnUserUpdate(float fElapsedTime){
@@ -39,44 +48,23 @@ bool EngineBackend::ConstructConsole(){
         };
 
         void EngineBackend::ConstructProjectionMatrix(){
-            proj = new projection;
-            proj->matrix[0][0] = proj->aspect_ratio * proj->f_fov_rad;
-            proj->matrix[1][1] = proj->f_fov_rad;
-            proj->matrix[2][2] = proj->z_far/(proj->z_far - proj->z_near);
-            proj->matrix[3][2] = (-(proj->z_far) * proj->z_near)/(proj->z_far - proj->z_near);
-            proj->matrix[2][3] = 1.0f;  // This should be 1.0f, not the translation
+            proj = new mat4x4;
+            proj->m[0][0] = aspect_ratio * f_fov_rad;
+            proj->m[1][1] = f_fov_rad;
+            proj->m[2][2] = z_far/(z_far - z_near);
+            proj->m[3][2] = (-(z_far) * z_near)/(z_far - z_near);
+            proj->m[2][3] = 1.0f;  // This should be 1.0f, not the translation
         };
 
-        void EngineBackend::DrawTriangles(mesh mesh){
-            // ConstructProjectionMatrix();
-            for(auto tri : mesh.tris){
-                triangle* projected_tri = new triangle;
-                for(int i=0; i<3; i++){
-                    MultiplyMatrixVector( tri.vertices[i],projected_tri->vertices[i], proj->matrix);
-                }
-
-
-                projected_tri->vertices[0].x+=1.0f;projected_tri->vertices[0].y+=1.0f;
-                projected_tri->vertices[1].x+=1.0f;projected_tri->vertices[1].y+=1.0f;
-                projected_tri->vertices[2].x+=1.0f;projected_tri->vertices[2].y+=1.0f;
-                projected_tri->vertices[0].x *= 0.3f  *(float)screen_width;
-                projected_tri->vertices[0].y *= 0.3f  *(float)screen_height;
-                projected_tri->vertices[1].x *= 0.3f  *(float)screen_width;
-                projected_tri->vertices[1].y *= 0.3f  *(float)screen_height;
-                projected_tri->vertices[2].x *= 0.3f  *(float)screen_width;
-                projected_tri->vertices[2].y *= 0.3f  *(float)screen_height;
-
-
-                DrawLine(projected_tri->vertices[0].x,projected_tri->vertices[0].y,projected_tri->vertices[1].x,projected_tri->vertices[1].y);
-                DrawLine(projected_tri->vertices[1].x,projected_tri->vertices[1].y,projected_tri->vertices[2].x,projected_tri->vertices[2].y);
-                DrawLine(projected_tri->vertices[2].x,projected_tri->vertices[2].y,projected_tri->vertices[0].x,projected_tri->vertices[0].y);
-
-            }
+        void EngineBackend::DrawTriangle(float x0, float y0, float x1, float y1, float x2, float y2){
+            DrawLine(x0,y0,x1,y1);
+            DrawLine(x1,y1,x2,y2);
+            DrawLine(x2,y2,x0,y0);
             refresh();
-            getch();
-
         };
+
         
+
 
         void EngineBackend::MultiplyMatrixVector(vec3D& i, vec3D& o, float m[][4])
         {
