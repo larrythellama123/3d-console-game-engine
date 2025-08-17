@@ -15,6 +15,12 @@
 #include <unistd.h>    // Required for STDOUT_FILENO
 #include <csignal> 
 
+#include <iostream>  // For input/output operations
+#include <fstream>   // For file stream operations (ifstream)
+#include <string>    // For string manipulation
+#include <vector>    // To store data dynamically
+#include <sstream>   // For parsing lines (istringstream)
+
 struct vec3D{
     float x,y,z;
 };
@@ -23,7 +29,7 @@ struct triangle{
     vec3D vertices[3];
 };
 
-struct mesh{
+struct Mesh{
     std::vector<triangle> tris;
 };
 
@@ -63,6 +69,16 @@ class EngineBackend{
         void PutPixel(int x, int y, char pixel);
 
         void GetTerminalSize(int& width, int& height);
+
+        int Illumination_calculation(vec3D normal, vec3D illum, triangle a);
+
+        void RasterizeTriangle_EdgeFunction(vec3D normal, vec3D illum, triangle a);
+
+        void Clear_DepthBuffer();
+
+        vec3D BaryCentricCoords(vec3D p, vec3D a, vec3D b, vec3D c);
+
+        std::vector<triangle> Read_File(std::string file_path);
         
         
     protected:
@@ -70,13 +86,11 @@ class EngineBackend{
         int screen_height;
         mat4x4* proj; 
         volatile sig_atomic_t program_interrupted = 0;
-        float screen_widths= 1000.0f;
-        float screen_heights = 1000.0f;
         float z_far = 1000.0f;
-        float z_near = 100.0f;
+        float z_near = 0.1f;
         float f_fov = 90.0f;
         float f_fov_rad = 1.0f /std::tan((f_fov/2)/180.0f * 3.14159f);
-        float aspect_ratio = static_cast<float>(screen_widths/screen_heights);
         float q = z_far/(z_far - z_near);
         float fElapsedTime;
+        std::vector<float> depth_buffer;
 };
