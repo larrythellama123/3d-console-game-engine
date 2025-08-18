@@ -21,15 +21,21 @@ bool EngineBackend::ConstructConsole(){
             }
             cbreak();
             noecho();
-            init_pair(9, COLOR_WHITE, COLOR_BLACK);   
+            init_pair(9, COLOR_GREEN, COLOR_BLACK);   
             int width; int height;
-            depth_buffer.resize(width * height, std::numeric_limits<float>::max());
             GetTerminalSize(width, height);
             screen_width = width;
             screen_height = height;
+            depth_buffer.resize(width * height, std::numeric_limits<float>::max());
+            color_buffer.resize(width * height, -1);
+
             ConstructProjectionMatrix();    
             return true;
         };
+        void EngineBackend::Clear_Buffers(){
+            std::fill(depth_buffer.begin(), depth_buffer.end(), std::numeric_limits<float>::max());
+            std::fill(color_buffer.begin(), color_buffer.end(), -1);
+        }
 
         void EngineBackend::Close(){
             endwin();
@@ -67,12 +73,12 @@ bool EngineBackend::ConstructConsole(){
             proj->m[2][3] = 1.0f;  // This should be 1.0f, not the translation
         };
 
-        void EngineBackend::DrawTriangle(float x0, float y0, float x1, float y1, float x2, float y2){
-            // attron(COLOR_PAIR(9));
-            DrawLine(x0,y0,x1,y1);
-            DrawLine(x1,y1,x2,y2);
-            DrawLine(x2,y2,x0,y0);
-            // attroff(COLOR_PAIR(9));
+        void EngineBackend::DrawTriangle(float x0, float y0, float x1, float y1, float x2, float y2, triangle a, triangle t){
+            attron(COLOR_PAIR(9));
+            DrawLine(x0,y0,x1,y1, a, t);
+            DrawLine(x1,y1,x2,y2, a, t);
+            DrawLine(x2,y2,x0,y0, a, t);
+            attroff(COLOR_PAIR(9));
         };
 
         
@@ -89,7 +95,7 @@ bool EngineBackend::ConstructConsole(){
             }   
         };
 
-        void EngineBackend::DrawLine(float fx0, float fy0, float fx1, float fy1){
+        void EngineBackend::DrawLine(float fx0, float fy0, float fx1, float fy1, triangle a, triangle t){
 
             int x0 = static_cast<int>(fx0);
             int x1 = static_cast<int>(fx1);
@@ -108,22 +114,22 @@ bool EngineBackend::ConstructConsole(){
                 while (true) {
                     // Check bounds before drawing
                     if (x >= 0 && x < screen_width && y >= 0 && y < screen_height) {
-                        // vec3D p;
-                        // p.x=x;
-                        // p.y=y;
-                        // p.z=0;
-                        // vec3D bary = BaryCentricCoords(p, a.vertices[0], a.vertices[1], a.vertices[2]);
-                        // // Interpolate depth using barycentric coordinates
-                        // float depth = bary.x * a.vertices[0].z + 
-                        //             bary.y * a.vertices[1].z + 
-                        //             bary.z * a.vertices[2].z;
-                        // if(depth_buffer[y*screen_width+x]>depth){
-                        //     depth_buffer[y*screen_width+x]=depth;
-                        // }
-                        // else{
-                        //     continue;
-                        // }
-                        PutPixel(x, y, '*');
+                        vec3D p;
+                        p.x=x;
+                        p.y=y;
+                        p.z=0;
+                        vec3D bary = BaryCentricCoords(p, a.vertices[0], a.vertices[1], a.vertices[2]);
+                        // Interpolate depth using barycentric coordinates
+                        float depth = bary.x * t.vertices[0].z + 
+                                    bary.y * t.vertices[1].z + 
+                                    bary.z * t.vertices[2].z;
+                    
+                        if(depth_buffer[y*screen_width+x]>depth){
+                            depth_buffer[y*screen_width+x]=depth;
+                            color_buffer[y*screen_width+x] = 9;
+                            // PutPixel(x, y, '*');
+                        }
+                        
                     }
                     
                     if (x == x1 && y == y1) break;
@@ -141,7 +147,18 @@ bool EngineBackend::ConstructConsole(){
                     }
             }
         }
-        //
+        void EngineBackend::Render(){
+            for(int i=0; i<screen_width*screen_height; i++){
+                if(color_buffer[i]!=-1){
+                    attron(COLOR_PAIR(color_buffer[i]));
+                    int x_coord = i%screen_width;
+                    int y_coord = (i-x_coord)/screen_width;
+                    PutPixel(x_coord,y_coord,'*');
+                    attroff(COLOR_PAIR(color_buffer[i]));
+                } 
+            }
+        }
+        
         void EngineBackend::PutPixel(int x, int y, char pixel){
             // Check bounds
             if (x < 0 || x >= screen_width || y < 0 || y >= screen_height) {
@@ -167,14 +184,12 @@ bool EngineBackend::ConstructConsole(){
             return color_pair;
         }
 
-        void EngineBackend::Clear_DepthBuffer(){
-            std::fill(depth_buffer.begin(), depth_buffer.end(), std::numeric_limits<float>::max());
-        }
+        
 
         
         
 
-        void EngineBackend::RasterizeTriangle_EdgeFunction(vec3D normal, vec3D illum, triangle a){
+        void EngineBackend::RasterizeTriangle_EdgeFunction(vec3D normal, vec3D illum, triangle a,triangle t){
             
             //find bounding box
             int minX = static_cast<int>(std::min({a.vertices[0].x,a.vertices[1].x,a.vertices[2].x}));
@@ -188,28 +203,15 @@ bool EngineBackend::ConstructConsole(){
             int color_pair = Illumination_calculation(normal, illum, a);
 
 
-            attron(COLOR_PAIR(color_pair));
-            // std::cout<<"maxY:"<<maxY;
-            // std::cout<<"maxX:"<<maxX;
-
-
+            // attron(COLOR_PAIR(color_pair));
             // For triangle with vertices A, B, C (counter-clockwise)
             vec3D p;
             for(int y=minY; y<maxY; y++){
-                    std::cout<<"y:"<<y;
-
                 for(int x=minX; x<maxX; x++){
                     p.x=x;
-                    p.y=y;
-                    std::cout<<"x:"<<x;
-
-                    // p.z=0.0f;
-                    // vec3D bary = BaryCentricCoords(p, a.vertices[0], a.vertices[1], a.vertices[2]);
-                    // // Interpolate depth using barycentric coordinates
-                    // float depth = bary.x * a.vertices[0].z + 
-                    //              bary.y * a.vertices[1].z + 
-                    //              bary.z * a.vertices[2].z;
-
+                    p.y=y;;
+                    p.z=0;
+                    
                     int w0 = EdgeFunction(a.vertices[1], a.vertices[2], p);  // Edge BC
                     int w1 = EdgeFunction(a.vertices[2], a.vertices[0], p);  // Edge CA  
                     int w2 = EdgeFunction(a.vertices[0], a.vertices[1], p);  // Edge AB
@@ -221,11 +223,22 @@ bool EngineBackend::ConstructConsole(){
                         // else{
                         //     continue;
                         // }
-                        PutPixel(x,y,'*');
+
+                        vec3D bary = BaryCentricCoords(p, a.vertices[0], a.vertices[1], a.vertices[2]);
+                        // Interpolate depth using barycentric coordinates
+                        float depth = bary.x * t.vertices[0].z + 
+                                    bary.y * t.vertices[1].z + 
+                                    bary.z * t.vertices[2].z;
+
+                        if(depth_buffer[y*screen_width+x]>depth){
+                            depth_buffer[y*screen_width+x]=depth;
+                            color_buffer[y*screen_width+x] = color_pair;
+                            // PutPixel(x, y, '*');
+                        }
                     }
                 }   
             }
-            attroff(COLOR_PAIR(color_pair));
+            // attroff(COLOR_PAIR(color_pair));
         }
 
 
@@ -236,7 +249,7 @@ bool EngineBackend::ConstructConsole(){
             vec3D v2 = {p.x - a.x, p.y - a.y, 0};
     
 
-
+            vec3D result = {0.0f,0.0f,0.0f};
             float dot00 = v0.x * v0.x + v0.y * v0.y;
             float dot01 = v0.x * v1.x + v0.y * v1.y;
             float dot02 = v0.x * v2.x + v0.y * v2.y;
@@ -251,18 +264,18 @@ bool EngineBackend::ConstructConsole(){
             // In matrix form:
             // [v2.x v1.x] [u] 
             // [v2.y v1.y] [v]
-            float D_xmatrix = v2.y * v1.x - v2.y * v1.y;
+            float D_xmatrix = v2.x * v1.y - v2.y * v1.x;
 
             // In matrix form:
             // [v0.x v2.x] [u] 
             // [v0.y v2.y] [v] 
-            float D_ymatrix = v2.x * v0.y - v2.y * v0.x;
+            float D_ymatrix = v2.y * v0.x - v2.x * v0.y;
 
-            float u =  D_coeff/D_xmatrix;
-            float v =  D_coeff/D_ymatrix;
+            float u =  D_xmatrix/D_coeff;
+            float v =  D_ymatrix/D_coeff;
             float w = 1 -u - v;
-
-            return {w,u,v};
+            result = {w,v,u};
+            return result;
         }
 
        
@@ -314,6 +327,10 @@ bool EngineBackend::ConstructConsole(){
                 }
             }
             return triangle_data;
+        }
+
+        void EngineBackend::Camera_Rotation(){
+            
         }
 
 

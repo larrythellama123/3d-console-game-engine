@@ -59,11 +59,11 @@ class EngineBackend{
 
         void ConstructProjectionMatrix();
 
-        void DrawTriangle(float x0, float y0, float x1, float y1, float x2, float y2);
+        void DrawTriangle(float x0, float y0, float x1, float y1, float x2, float y2, triangle a, triangle t);
 
         void MultiplyMatrixVector(vec3D& i, vec3D& o, float m[][4]);
 
-        void DrawLine(float x0, float x1, float y0, float y1);
+        void DrawLine(float x0, float x1, float y0, float y1, triangle a, triangle t);
 
       
         void PutPixel(int x, int y, char pixel);
@@ -72,13 +72,17 @@ class EngineBackend{
 
         int Illumination_calculation(vec3D normal, vec3D illum, triangle a);
 
-        void RasterizeTriangle_EdgeFunction(vec3D normal, vec3D illum, triangle a);
+        void RasterizeTriangle_EdgeFunction(vec3D normal, vec3D illum, triangle a, triangle triTranslated);
 
-        void Clear_DepthBuffer();
+        void Clear_Buffers();
 
         vec3D BaryCentricCoords(vec3D p, vec3D a, vec3D b, vec3D c);
 
         std::vector<triangle> Read_File(std::string file_path);
+
+        void Render();
+
+        void Camera_Rotation();
         
         
     protected:
@@ -93,4 +97,5 @@ class EngineBackend{
         float q = z_far/(z_far - z_near);
         float fElapsedTime;
         std::vector<float> depth_buffer;
+        std::vector<int> color_buffer;
 };

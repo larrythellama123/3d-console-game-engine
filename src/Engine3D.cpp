@@ -59,6 +59,7 @@ class Engine3D: public EngineBackend{
             matRotX.m[2][1] = -sinf(fTheta * 0.5f);
             matRotX.m[2][2] = cosf(fTheta * 0.5f);
             matRotX.m[3][3] = 1;
+            Clear_Buffers();
             for (auto tri : mesh.tris)
             {
                 triangle triProjected, triTranslated, triRotatedZ, triRotatedZX;
@@ -140,12 +141,13 @@ class Engine3D: public EngineBackend{
                 triProjected.vertices[2].y *= 0.5f * (float)screen_height;
 
                 // Rasterize triangle
-                    // DrawTriangle(triProjected.vertices[0].x, triProjected.vertices[0].y,
-                    //     triProjected.vertices[1].x, triProjected.vertices[1].y,
-                    //     triProjected.vertices[2].x, triProjected.vertices[2].y);
+                DrawTriangle(triProjected.vertices[0].x, triProjected.vertices[0].y,
+                    triProjected.vertices[1].x, triProjected.vertices[1].y,
+                    triProjected.vertices[2].x, triProjected.vertices[2].y, triProjected,triTranslated);
 
-                RasterizeTriangle_EdgeFunction(normal,illumination,triProjected);
+                RasterizeTriangle_EdgeFunction(normal,illumination,triProjected, triTranslated);
             }
+            Render();
             return true;
         }
 
