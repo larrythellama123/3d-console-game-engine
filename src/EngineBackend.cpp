@@ -21,6 +21,8 @@ bool EngineBackend::ConstructConsole(){
             }
             cbreak();
             noecho();
+            keypad(stdscr, TRUE);
+            nodelay(stdscr, TRUE);
             init_pair(9, COLOR_GREEN, COLOR_BLACK);   
             int width; int height;
             GetTerminalSize(width, height);
@@ -50,6 +52,8 @@ bool EngineBackend::ConstructConsole(){
                 start_time = end_time;
                 fElapsedTime = elapsedTime.count();
                 OnUserUpdate(fElapsedTime);
+
+                
                 refresh();
                 clear();
             }
@@ -82,18 +86,7 @@ bool EngineBackend::ConstructConsole(){
         };
 
         
-        void EngineBackend::MultiplyMatrixVector(vec3D& i, vec3D& o, float m[][4])
-        {
-            o.x = i.x * m[0][0] + i.y * m[1][0] + i.z * m[2][0] + m[3][0];
-            o.y = i.x * m[0][1] + i.y * m[1][1] + i.z * m[2][1] + m[3][1];
-            o.z = i.x * m[0][2] + i.y * m[1][2] + i.z * m[2][2] + m[3][2];
-            float w = i.x * m[0][3] + i.y * m[1][3] + i.z * m[2][3] + m[3][3];
-
-            if (w != 0.0f)
-            {
-                o.x /= w; o.y /= w; o.z /= w;
-            }   
-        };
+        
 
         void EngineBackend::DrawLine(float fx0, float fy0, float fx1, float fy1, triangle a, triangle t){
 
@@ -148,6 +141,7 @@ bool EngineBackend::ConstructConsole(){
             }
         }
         void EngineBackend::Render(){
+           
             for(int i=0; i<screen_width*screen_height; i++){
                 if(color_buffer[i]!=-1){
                     attron(COLOR_PAIR(color_buffer[i]));
@@ -300,19 +294,28 @@ bool EngineBackend::ConstructConsole(){
             }
         }
 
+
+
         std::vector<triangle> EngineBackend::Read_File(std::string file_path){
             std::ifstream file(file_path); // Replace with your file path
             std::vector<vec3D> vertice_data;
             std::vector<triangle> triangle_data;
+
+            triangle_data.reserve(300000); // Adjust based on expected size
+            
+            vertice_data.reserve(500000); // Pre-allocate reasonable size
+                
+            int line_number = 0;
             if (!file.is_open()) {
                 std::cerr << "Error: Could not open file!" << std::endl;
             }
             std::string line;
             while (std::getline(file, line)) {
+                line_number++;
+                std::cout<<line_number << " ";
                 std::istringstream iss(line);
                 std::string prefix;
                 iss >> prefix;
-
                 if(prefix == "v"){
                     float x, y, z;
                     iss >> x >> y >> z;  
@@ -321,16 +324,199 @@ bool EngineBackend::ConstructConsole(){
                 }
                 if(prefix == "f"){
                     int x, y, z;
-                    iss >> x >> y >> z;
-                    triangle tri ={vertice_data[x-1],vertice_data[y-1],vertice_data[z-1]};
-                    triangle_data.push_back(tri);
+
+                    if (iss >> x >> y >> z) {
+
+
+                        // Convert to 0-based indexing and check bounds
+                        int idx1 = x - 1;
+                        int idx2 = y - 1; 
+                        int idx3 = z - 1;
+                        
+                        // Bounds checking
+                        if (idx1 >= 0 && idx1 < vertice_data.size() &&
+                            idx2 >= 0 && idx2 < vertice_data.size() &&
+                            idx3 >= 0 && idx3 < vertice_data.size()) {
+                            
+                            triangle tri = {vertice_data[idx1], vertice_data[idx2], vertice_data[idx3]};
+                            triangle_data.push_back(tri);
+                        } else {
+                            std::cerr << "Error: Invalid face indices on line " << line_number 
+                                    << " (indices: " << x << "," << y << "," << z 
+                                    << ", vertex count: " << vertice_data.size() << ")" << std::endl;
+                        }
+                    } else {
+                        std::cerr << "Warning: Invalid face on line " << line_number << std::endl;
+                    }
+
+                    // iss >> x >> y >> z;
+                    // // std::cout<<x-1<<" x";
+
+                    // std::cout<<y-1<<" y";
+                    // triangle tri ={vertice_data[x-1],vertice_data[y-1],vertice_data[z-1]};
+                    // triangle_data.push_back(tri);
                 }
             }
             return triangle_data;
         }
 
         void EngineBackend::Camera_Rotation(){
+            //shld i find all the points in 3d space
             
         }
+
+        mat4x4 EngineBackend::pointAt(vec3D pos, vec3D target, vec3D up) {
+            vec3D f = Vector_Sub(target, pos);
+            vec3D newForward = normalize(f);
+            vec3D a = Vector_Mul(newForward, dot(up, newForward));
+            vec3D newUp = Vector_Sub(up, a);
+            newUp =  normalize(newUp);
+            vec3D r = Vector_CrossProduct(newUp, newForward);
+            vec3D newRight = normalize(r);
+            vec3D u = Vector_CrossProduct(newRight, newForward);
+
+            mat4x4 matrix;
+            matrix.m[0][0] = newRight.x;	matrix.m[0][1] = newRight.y;	matrix.m[0][2] = newRight.z;	matrix.m[0][3] = 0.0f;
+            matrix.m[1][0] = newUp.x;		matrix.m[1][1] = newUp.y;		matrix.m[1][2] = newUp.z;		matrix.m[1][3] = 0.0f;
+            matrix.m[2][0] = newForward.x;	matrix.m[2][1] = newForward.y;	matrix.m[2][2] = newForward.z;	matrix.m[2][3] = 0.0f;
+            matrix.m[3][0] = pos.x;			matrix.m[3][1] = pos.y;			matrix.m[3][2] = pos.z;			matrix.m[3][3] = 1.0f;
+            return matrix;
+        }
+
+        float EngineBackend::dot(vec3D& i, vec3D& j){
+            float res = i.x * j.x + i.y * j.y + i.z * j.z;
+            return res;
+        }   
+
+        vec3D EngineBackend::normalize(vec3D& vector){
+            float magnitude = sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+            if (magnitude > 0.0f) { // Avoid division by zero for zero vectors
+                vector.x /= magnitude;
+                vector.y /= magnitude;
+                vector.z /= magnitude;
+            }
+            return vector;
+        }
+
+        vec3D EngineBackend::Vector_Mul(vec3D &v1, float k)
+        {
+            return { v1.x * k, v1.y * k, v1.z * k };
+        }
+
+        vec3D EngineBackend::Vector_Sub(vec3D& v1, vec3D& v2)
+        {
+            return {v1.x-v2.x, v1.y-v2.y, v1.z-v2.z};
+        }
+
+
+        mat4x4 EngineBackend::Matrix_QuickInverse(mat4x4 &m) 
+        {
+            mat4x4 matrix;
+            matrix.m[0][0] = m.m[0][0]; matrix.m[0][1] = m.m[1][0]; matrix.m[0][2] = m.m[2][0]; matrix.m[0][3] = 0.0f;
+            matrix.m[1][0] = m.m[0][1]; matrix.m[1][1] = m.m[1][1]; matrix.m[1][2] = m.m[2][1]; matrix.m[1][3] = 0.0f;
+            matrix.m[2][0] = m.m[0][2]; matrix.m[2][1] = m.m[1][2]; matrix.m[2][2] = m.m[2][2]; matrix.m[2][3] = 0.0f;
+            matrix.m[3][0] = -(m.m[3][0] * matrix.m[0][0] + m.m[3][1] * matrix.m[1][0] + m.m[3][2] * matrix.m[2][0]);
+            matrix.m[3][1] = -(m.m[3][0] * matrix.m[0][1] + m.m[3][1] * matrix.m[1][1] + m.m[3][2] * matrix.m[2][1]);
+            matrix.m[3][2] = -(m.m[3][0] * matrix.m[0][2] + m.m[3][1] * matrix.m[1][2] + m.m[3][2] * matrix.m[2][2]);
+            matrix.m[3][3] = 1.0f;
+            return matrix;
+        }
+
+        vec3D EngineBackend::Vector_CrossProduct(vec3D &v1, vec3D &v2)
+        {
+            vec3D v;
+            v.x = v1.y * v2.z - v1.z * v2.y;
+            v.y = v1.z * v2.x - v1.x * v2.z;
+            v.z = v1.x * v2.y - v1.y * v2.x;
+            return v;
+        }
+
+        vec3D EngineBackend::Vector_Add(vec3D &v1, vec3D &v2)
+        {
+            return { v1.x + v2.x, v1.y + v2.y, v1.z + v2.z };
+        }
+
+        mat4x4 EngineBackend::Matrix_MakeIdentity()
+        {
+            mat4x4 matrix;
+            matrix.m[0][0] = 1.0f;
+            matrix.m[1][1] = 1.0f;
+            matrix.m[2][2] = 1.0f;
+            matrix.m[3][3] = 1.0f;
+            return matrix;
+        }
+
+        mat4x4 EngineBackend::Matrix_MakeRotationX(float fAngleRad)
+        {
+            mat4x4 matrix;
+            matrix.m[0][0] = 1.0f;
+            matrix.m[1][1] = cosf(fAngleRad);
+            matrix.m[1][2] = sinf(fAngleRad);
+            matrix.m[2][1] = -sinf(fAngleRad);
+            matrix.m[2][2] = cosf(fAngleRad);
+            matrix.m[3][3] = 1.0f;
+            return matrix;
+        }
+
+        mat4x4 EngineBackend::Matrix_MakeRotationY(float fAngleRad)
+        {
+            mat4x4 matrix;
+            matrix.m[0][0] = cosf(fAngleRad);
+            matrix.m[0][2] = sinf(fAngleRad);
+            matrix.m[2][0] = -sinf(fAngleRad);
+            matrix.m[1][1] = 1.0f;
+            matrix.m[2][2] = cosf(fAngleRad);
+            matrix.m[3][3] = 1.0f;
+            return matrix;
+        }
+
+        mat4x4 EngineBackend::Matrix_MakeRotationZ(float fAngleRad)
+        {
+            mat4x4 matrix;
+            matrix.m[0][0] = cosf(fAngleRad);
+            matrix.m[0][1] = sinf(fAngleRad);
+            matrix.m[1][0] = -sinf(fAngleRad);
+            matrix.m[1][1] = cosf(fAngleRad);
+            matrix.m[2][2] = 1.0f;
+            matrix.m[3][3] = 1.0f;
+            return matrix;
+        }
+
+        mat4x4 EngineBackend::Matrix_MakeTranslation(float x, float y, float z)
+        {
+            mat4x4 matrix;
+            matrix.m[0][0] = 1.0f;
+            matrix.m[1][1] = 1.0f;
+            matrix.m[2][2] = 1.0f;
+            matrix.m[3][3] = 1.0f;
+            matrix.m[3][0] = x;
+            matrix.m[3][1] = y;
+            matrix.m[3][2] = z;
+            return matrix;
+        }
+
+        mat4x4 EngineBackend::Matrix_MultiplyMatrix(mat4x4 &m1, mat4x4 &m2)
+        {
+            mat4x4 matrix;
+            for (int c = 0; c < 4; c++)
+                for (int r = 0; r < 4; r++)
+                    matrix.m[r][c] = m1.m[r][0] * m2.m[0][c] + m1.m[r][1] * m2.m[1][c] + m1.m[r][2] * m2.m[2][c] + m1.m[r][3] * m2.m[3][c];
+            return matrix;
+        }
+
+        void EngineBackend::MultiplyMatrixVector(vec3D& i, vec3D& o, float m[][4])
+        {
+            o.x = i.x * m[0][0] + i.y * m[1][0] + i.z * m[2][0] + m[3][0];
+            o.y = i.x * m[0][1] + i.y * m[1][1] + i.z * m[2][1] + m[3][1];
+            o.z = i.x * m[0][2] + i.y * m[1][2] + i.z * m[2][2] + m[3][2];
+            float w = i.x * m[0][3] + i.y * m[1][3] + i.z * m[2][3] + m[3][3];
+
+            if (w != 0.0f)
+            {
+                o.x /= w; o.y /= w; o.z /= w;
+            }   
+        };
+
+            
 
 

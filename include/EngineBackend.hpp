@@ -22,7 +22,10 @@
 #include <sstream>   // For parsing lines (istringstream)
 
 struct vec3D{
-    float x,y,z;
+    float x=0;
+    float y=0;
+    float z=0;
+    float w=1;
 };
 
 struct triangle{
@@ -83,6 +86,30 @@ class EngineBackend{
         void Render();
 
         void Camera_Rotation();
+
+        vec3D normalize(vec3D& vector );
+
+        mat4x4 pointAt(vec3D eye, vec3D target, vec3D up);
+
+        float dot(vec3D& i, vec3D& j);
+
+        vec3D Vector_Mul(vec3D &v1, float k);
+        vec3D Vector_Sub(vec3D &v1, vec3D &v2);
+        mat4x4 Matrix_QuickInverse(mat4x4 &m);
+        vec3D Vector_CrossProduct(vec3D &v1, vec3D &v2);
+        vec3D Vector_Add(vec3D &v1, vec3D &v2);
+
+        mat4x4 Matrix_MakeIdentity();
+
+        mat4x4 Matrix_MakeRotationX(float fAngleRad);
+
+        mat4x4 Matrix_MakeRotationY(float fAngleRad);
+
+        mat4x4 Matrix_MakeRotationZ(float fAngleRad);
+
+        mat4x4 Matrix_MakeTranslation(float x, float y, float z);
+
+        mat4x4 Matrix_MultiplyMatrix(mat4x4 &m1, mat4x4 &m2);
         
         
     protected:
@@ -98,4 +125,5 @@ class EngineBackend{
         float fElapsedTime;
         std::vector<float> depth_buffer;
         std::vector<int> color_buffer;
+
 };
