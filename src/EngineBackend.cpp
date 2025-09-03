@@ -52,7 +52,7 @@ bool EngineBackend::ConstructConsole(){
                 start_time = end_time;
                 fElapsedTime = elapsedTime.count();
                 OnUserUpdate(fElapsedTime);
-
+                // break;
                 
                 refresh();
                 clear();
@@ -67,14 +67,23 @@ bool EngineBackend::ConstructConsole(){
             return true;
         };
 
+        // void EngineBackend::ConstructProjectionMatrix(){
+        //     float aspect_ratio = static_cast<float>(screen_width/screen_height) * 0.2f;
+        //     proj = new mat4x4;
+        //     proj->m[0][0] = aspect_ratio * f_fov_rad;
+        //     proj->m[1][1] = f_fov_rad;
+        //     proj->m[2][2] = z_far/(z_far - z_near);
+        //     proj->m[3][2] = (-(z_far) * z_near)/(z_far - z_near);
+        //     proj->m[2][3] = 1.0f;  // This should be 1.0f, not the translation
+        // };
+
         void EngineBackend::ConstructProjectionMatrix(){
             float aspect_ratio = static_cast<float>(screen_width/screen_height) * 0.2f;
-            proj = new mat4x4;
-            proj->m[0][0] = aspect_ratio * f_fov_rad;
-            proj->m[1][1] = f_fov_rad;
-            proj->m[2][2] = z_far/(z_far - z_near);
-            proj->m[3][2] = (-(z_far) * z_near)/(z_far - z_near);
-            proj->m[2][3] = 1.0f;  // This should be 1.0f, not the translation
+            proj.m[0][0] = aspect_ratio * f_fov_rad;
+            proj.m[1][1] = f_fov_rad;
+            proj.m[2][2] = z_far/(z_far - z_near);
+            proj.m[3][2] = (-(z_far) * z_near)/(z_far - z_near);
+            proj.m[2][3] = 1.0f;  // This should be 1.0f, not the translation
         };
 
         void EngineBackend::DrawTriangle(float x0, float y0, float x1, float y1, float x2, float y2, triangle a, triangle t){
@@ -312,7 +321,7 @@ bool EngineBackend::ConstructConsole(){
             std::string line;
             while (std::getline(file, line)) {
                 line_number++;
-                std::cout<<line_number << " ";
+                // std::cout<<line_number << " ";
                 std::istringstream iss(line);
                 std::string prefix;
                 iss >> prefix;
@@ -504,12 +513,12 @@ bool EngineBackend::ConstructConsole(){
             return matrix;
         }
 
-        void EngineBackend::MultiplyMatrixVector(vec3D& i, vec3D& o, float m[][4])
+        void EngineBackend::MultiplyMatrixVector(vec3D& i, vec3D& o, mat4x4& m)
         {
-            o.x = i.x * m[0][0] + i.y * m[1][0] + i.z * m[2][0] + m[3][0];
-            o.y = i.x * m[0][1] + i.y * m[1][1] + i.z * m[2][1] + m[3][1];
-            o.z = i.x * m[0][2] + i.y * m[1][2] + i.z * m[2][2] + m[3][2];
-            float w = i.x * m[0][3] + i.y * m[1][3] + i.z * m[2][3] + m[3][3];
+            o.x = i.x * m.m[0][0] + i.y * m.m[1][0] + i.z * m.m[2][0] + m.m[3][0];
+            o.y = i.x * m.m[0][1] + i.y * m.m[1][1] + i.z * m.m[2][1] + m.m[3][1];
+            o.z = i.x * m.m[0][2] + i.y * m.m[1][2] + i.z * m.m[2][2] + m.m[3][2];
+            float w = i.x * m.m[0][3] + i.y * m.m[1][3] + i.z * m.m[2][3] + m.m[3][3];
 
             if (w != 0.0f)
             {
@@ -517,6 +526,155 @@ bool EngineBackend::ConstructConsole(){
             }   
         };
 
+        vec3D EngineBackend::Matrix_MultiplyVector(mat4x4 &m, vec3D &i)
+        {
+            vec3D v;
+            v.x = i.x * m.m[0][0] + i.y * m.m[1][0] + i.z * m.m[2][0] + i.w * m.m[3][0];
+            v.y = i.x * m.m[0][1] + i.y * m.m[1][1] + i.z * m.m[2][1] + i.w * m.m[3][1];
+            v.z = i.x * m.m[0][2] + i.y * m.m[1][2] + i.z * m.m[2][2] + i.w * m.m[3][2];
+            v.w = i.x * m.m[0][3] + i.y * m.m[1][3] + i.z * m.m[2][3] + i.w * m.m[3][3];
+            return v;
+        }
+
+        void EngineBackend::Clipping(triangle tri){
+            std::deque<triangle> tqueue;
+            tqueue.push_back(tri);
+            Plane_Clipping(left_plane,tqueue);
+            Plane_Clipping(right_plane,tqueue);
+            Plane_Clipping(top_plane,tqueue);
+            Plane_Clipping(bottom_plane, tqueue);
+            Plane_Clipping(near_plane, tqueue);
+            Plane_Clipping(far_plane, tqueue);
+
+            for(auto a: tqueue){
+                global_tqueue.push_back(a);
+            }
+        }
+
+        void EngineBackend::Plane_Clipping(vec3D plane, std::deque<triangle>& tqueue){
+            std::vector<vec3D> vqueue;
+            triangle tri;
+            int que_len = tqueue.size();
+            while (que_len>0){
+    
+                tri = tqueue.back();
+                tqueue.pop_back();
+                que_len--;
+    
+                vec3D a = tri.vertices[0];
+                vec3D b = tri.vertices[1];
+                vec3D c = tri.vertices[2];
+
+                //point infront of the plane
+                if(a.x*plane.x + a.y*plane.y +  a.z*plane.z + plane.w <= 0){
+                    vqueue.push_back(a);
+                }
+                //check if point of intersection exists
+                vec3D AB_dir = Vector_Sub(a,b);
+                vec3D poi = Vector_Intersect_Plane(plane,AB_dir,a);
+                if(poi.x==0 && poi.y==0 && poi.z==0){  }
+                else{
+                    vqueue.push_back(poi);
+                }
+
+                if(b.x*plane.x + b.y*plane.y +  b.z*plane.z + plane.w <= 0){
+                    vqueue.push_back(b);
+                }
+                //check if point of intersection exists
+                vec3D BC = Vector_Sub(b,c);
+                poi = Vector_Intersect_Plane(plane,BC,b);
+                if(poi.x==0 && poi.y==0 && poi.z==0){}
+                else{
+                    vqueue.push_back(poi);
+                }
+
+                if(c.x*plane.x + c.y*plane.y +  c.z*plane.z + plane.w <= 0){
+                    vqueue.push_back(c);
+                }
+                //check if point of intersection exists
+                vec3D CA = Vector_Sub(c,a);
+                poi = Vector_Intersect_Plane(plane,CA,c);
+                if(poi.x==0 && poi.y==0 && poi.z==0){}
+                else{
+                    vqueue.push_back(poi);
+                }
+
+                if(vqueue.size()==4){
+                    triangle t1 = {vqueue[0],vqueue[1], vqueue[2]};
+                    triangle t2 = {vqueue[0],vqueue[2], vqueue[3]};
+                    tqueue.push_back(t1);
+                    tqueue.push_back(t2);
+                }
+
+                if(vqueue.size()==3){
+                    triangle t1 = {vqueue[0],vqueue[1], vqueue[2]};
+                    tqueue.push_back(t1);
+                }
+                vqueue.clear();
+            }
+
+        }
+
+        void EngineBackend::Generate_Planes(mat4x4 matCamera){
+            mat4x4 view_proj = Matrix_MultiplyMatrix(proj, matCamera);
+            vec3D w_val = {view_proj.m[3][0],view_proj.m[3][1],view_proj.m[3][2],view_proj.m[3][3]};
+            vec3D x_val = {view_proj.m[0][0],view_proj.m[0][1],view_proj.m[0][2],view_proj.m[0][3]};
+            vec3D y_val = {view_proj.m[1][0],view_proj.m[1][1],view_proj.m[1][2],view_proj.m[1][3]};
+            vec3D z_val = {view_proj.m[2][0],view_proj.m[2][1],view_proj.m[2][2],view_proj.m[2][3]};
+
+            left_plane  = Vector_Add(w_val,x_val);
+            right_plane  = Vector_Sub(w_val,x_val);
+
+            top_plane  = Vector_Add(w_val,y_val);
+            bottom_plane  = Vector_Sub(w_val,y_val);
+            
+            far_plane  = Vector_Add(w_val,z_val);
+            near_plane  = Vector_Sub(w_val,z_val);
+        }
+
+        vec3D EngineBackend::Vector_Intersect_Plane(vec3D plane, vec3D vector, vec3D point){
+            float x, y, z, w;
+            x = plane.x;
+            y = plane.y;
+            z = plane.z;
+            w = plane.w;
+
+            vec3D plane_normal = {plane.x, plane.y, plane.z};
+
+            if(dot(plane_normal, vector)==0){
+                return {0,0,0};
+            }
+            // float tmp = (w -(plane_normal.x*point.x + plane_normal.y*point.y + plane_normal.z*point.z)) /(plane_normal.x*vector.x + plane_normal.y*vector.y + plane_normal.z*vector.z);
+            float tmp = (-w - dot(plane_normal, point)) / dot(plane_normal, vector);
+            vec3D poi;
+            poi.x = (point.x + vector.x*tmp);
+            poi.y = (point.y + vector.y*tmp);
+            poi.z = (point.z + vector.z*tmp);
+
+            return poi;
+        }
+
+
+        //pseudocode
+        //check if a point is behind or infront of a plane
+            //if infront it passes and gets added to the list
+            //if behind it does not get added to the list 
+            //Use the vector intersect fucntion to see if the vector of A and B intersect with the plane
+            //if it does, add the vector
+
+        //check if the vector in each tri intresects the plane
+
+        //if none of the vectors intersect
+            //sub a point of the vector inside the plane equation and check the result
+            //if it less than 0, it is behind the plan e 
+
+        //if the vector intersects
+            //get the new coords of the intersection
+            //if number of intersections == 2, 
+
+        
+
             
 
-
+        //after first intersection with the plane
+        // 

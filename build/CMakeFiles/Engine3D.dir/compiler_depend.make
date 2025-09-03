@@ -315,8 +315,15 @@ CMakeFiles/Engine3D.dir/src/EngineBackend.cpp.o: ../src/EngineBackend.cpp \
   /usr/include/x86_64-linux-gnu/c++/11/bits/c++io.h \
   /usr/include/c++/11/bits/fstream.tcc \
   /usr/include/c++/11/sstream \
-  /usr/include/c++/11/bits/sstream.tcc
+  /usr/include/c++/11/bits/sstream.tcc \
+  /usr/include/c++/11/deque \
+  /usr/include/c++/11/bits/stl_deque.h \
+  /usr/include/c++/11/bits/deque.tcc
 
+
+/usr/include/c++/11/bits/deque.tcc:
+
+/usr/include/c++/11/deque:
 
 /usr/include/c++/11/sstream:
 
@@ -413,6 +420,8 @@ CMakeFiles/Engine3D.dir/src/EngineBackend.cpp.o: ../src/EngineBackend.cpp \
 /usr/include/c++/11/tr1/modified_bessel_func.tcc:
 
 /usr/include/x86_64-linux-gnu/bits/endian.h:
+
+/usr/include/c++/11/bits/stl_deque.h:
 
 /usr/include/x86_64-linux-gnu/gnu/stubs.h:
 

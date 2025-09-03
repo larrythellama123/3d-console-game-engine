@@ -20,6 +20,7 @@
 #include <string>    // For string manipulation
 #include <vector>    // To store data dynamically
 #include <sstream>   // For parsing lines (istringstream)
+#include <deque>
 
 struct vec3D{
     float x=0;
@@ -64,7 +65,7 @@ class EngineBackend{
 
         void DrawTriangle(float x0, float y0, float x1, float y1, float x2, float y2, triangle a, triangle t);
 
-        void MultiplyMatrixVector(vec3D& i, vec3D& o, float m[][4]);
+        void MultiplyMatrixVector(vec3D& i, vec3D& o, mat4x4& m);
 
         void DrawLine(float x0, float x1, float y0, float y1, triangle a, triangle t);
 
@@ -110,12 +111,16 @@ class EngineBackend{
         mat4x4 Matrix_MakeTranslation(float x, float y, float z);
 
         mat4x4 Matrix_MultiplyMatrix(mat4x4 &m1, mat4x4 &m2);
-        
+        vec3D Matrix_MultiplyVector(mat4x4 &m, vec3D &i);
+        void Plane_Clipping( vec3D plane,  std::deque<triangle>& tqueue);
+        void Clipping(triangle tri);
+        void Generate_Planes(mat4x4 matCamera);
+        vec3D Vector_Intersect_Plane(vec3D plane, vec3D vector, vec3D point);        
         
     protected:
         int screen_width;
         int screen_height;
-        mat4x4* proj; 
+        mat4x4 proj; 
         volatile sig_atomic_t program_interrupted = 0;
         float z_far = 1000.0f;
         float z_near = 0.1f;
@@ -125,5 +130,13 @@ class EngineBackend{
         float fElapsedTime;
         std::vector<float> depth_buffer;
         std::vector<int> color_buffer;
+        std::deque<triangle> global_tqueue;
+        vec3D left_plane;
+        vec3D right_plane;
+        vec3D top_plane;
+        vec3D bottom_plane;
+        vec3D near_plane;
+        vec3D far_plane;
+        
 
 };
