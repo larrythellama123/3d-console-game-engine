@@ -99,6 +99,9 @@ class EngineBackend{
         mat4x4 Matrix_QuickInverse(mat4x4 &m);
         vec3D Vector_CrossProduct(vec3D &v1, vec3D &v2);
         vec3D Vector_Add(vec3D &v1, vec3D &v2);
+        vec3D Vector_Normalise(vec3D &v);
+        float Vector_Length(vec3D &v);
+        vec3D Vector_Div(vec3D &v1, float k);
 
         mat4x4 Matrix_MakeIdentity();
 
@@ -115,7 +118,9 @@ class EngineBackend{
         void Plane_Clipping( vec3D plane,  std::deque<triangle>& tqueue);
         void Clipping(triangle tri);
         void Generate_Planes(mat4x4 matCamera);
-        vec3D Vector_Intersect_Plane(vec3D plane, vec3D vector, vec3D point);        
+        // vec3D Vector_Intersect_Plane(vec3D plane, vec3D vector, vec3D point);        
+        vec3D Vector_IntersectPlane(vec3D &plane_p, vec3D &plane_n, vec3D &lineStart, vec3D &lineEnd);
+        int Triangle_ClipAgainstPlane(vec3D plane_p, vec3D plane_n, triangle &in_tri, triangle &out_tri1, triangle &out_tri2);
         
     protected:
         int screen_width;

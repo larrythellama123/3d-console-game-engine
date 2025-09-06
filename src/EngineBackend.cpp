@@ -55,7 +55,6 @@ bool EngineBackend::ConstructConsole(){
                 // break;
                 
                 refresh();
-                clear();
             }
         };
 
@@ -67,15 +66,6 @@ bool EngineBackend::ConstructConsole(){
             return true;
         };
 
-        // void EngineBackend::ConstructProjectionMatrix(){
-        //     float aspect_ratio = static_cast<float>(screen_width/screen_height) * 0.2f;
-        //     proj = new mat4x4;
-        //     proj->m[0][0] = aspect_ratio * f_fov_rad;
-        //     proj->m[1][1] = f_fov_rad;
-        //     proj->m[2][2] = z_far/(z_far - z_near);
-        //     proj->m[3][2] = (-(z_far) * z_near)/(z_far - z_near);
-        //     proj->m[2][3] = 1.0f;  // This should be 1.0f, not the translation
-        // };
 
         void EngineBackend::ConstructProjectionMatrix(){
             float aspect_ratio = static_cast<float>(screen_width/screen_height) * 0.2f;
@@ -156,7 +146,7 @@ bool EngineBackend::ConstructConsole(){
                     attron(COLOR_PAIR(color_buffer[i]));
                     int x_coord = i%screen_width;
                     int y_coord = (i-x_coord)/screen_width;
-                    PutPixel(x_coord,y_coord,'*');
+                    PutPixel(x_coord,y_coord,'#');
                     attroff(COLOR_PAIR(color_buffer[i]));
                 } 
             }
@@ -172,24 +162,33 @@ bool EngineBackend::ConstructConsole(){
             addch(pixel);
         }
 
-        int EngineBackend::Illumination_calculation(vec3D normal, vec3D illum,  triangle a){
+        int EngineBackend::Illumination_calculation(vec3D normal, vec3D illum, triangle a){
             int color_pair = 0;
-            vec3D illum_obj = {(a.vertices[0].x - illum.x),(a.vertices[0].y - illum.y),(a.vertices[0].z - illum.z)};
-            float dp = (normal.x*(a.vertices[0].x - illum.x)) + (normal.y*(a.vertices[0].y - illum.y)) + (normal.z*(a.vertices[0].z - illum.z));
-            float normal_magnitude = sqrtf(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
-            float illum_obj_magnitude = sqrtf(illum_obj.x * illum_obj.x + illum_obj.y * illum_obj.y + illum_obj.z * illum_obj.z);
-            float cos_theta = dp/(normal_magnitude*illum_obj_magnitude);
-            if(dp>0.0f){
-                  // Map intensity to one of your 8 pre-defined color pairs (1-8)
+            
+            // Since illum is {0,0,0} in view space, light direction is just negative vertex position
+            vec3D light_dir = {-a.vertices[0].x, -a.vertices[0].y, -a.vertices[0].z};
+            
+            // Normalize light direction
+            float light_magnitude = sqrtf(light_dir.x * light_dir.x + light_dir.y * light_dir.y + light_dir.z * light_dir.z);
+            if(light_magnitude > 0.0f) {
+                light_dir.x /= light_magnitude;
+                light_dir.y /= light_magnitude;
+                light_dir.z /= light_magnitude;
+            }
+            
+            // Normal should already be normalized from your main loop
+            float cos_theta = (normal.x * light_dir.x) + (normal.y * light_dir.y) + (normal.z * light_dir.z);
+            
+            // Only light surfaces facing the camera
+            if(cos_theta > 0.0f) {
                 color_pair = static_cast<int>(cos_theta * 7) + 1;
                 color_pair = std::max(1, std::min(color_pair, 8));
             }
+            
             return color_pair;
         }
-
         
 
-        
         
 
         void EngineBackend::RasterizeTriangle_EdgeFunction(vec3D normal, vec3D illum, triangle a,triangle t){
@@ -203,10 +202,9 @@ bool EngineBackend::ConstructConsole(){
             auto EdgeFunction = [](vec3D a, vec3D b, vec3D p) -> int { return (p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x); };
 
 
-            int color_pair = Illumination_calculation(normal, illum, a);
+            int color_pair = std::max(3,Illumination_calculation(normal, illum, t));
 
 
-            // attron(COLOR_PAIR(color_pair));
             // For triangle with vertices A, B, C (counter-clockwise)
             vec3D p;
             for(int y=minY; y<maxY; y++){
@@ -220,13 +218,7 @@ bool EngineBackend::ConstructConsole(){
                     int w2 = EdgeFunction(a.vertices[0], a.vertices[1], p);  // Edge AB
 
                     if (w0 >= 0 && w1 >= 0 && w2 >= 0) {
-                        // if(depth_buffer[y*screen_width+x]>depth){
-                        //     depth_buffer[y*screen_width+x]=depth;
-                        // }
-                        // else{
-                        //     continue;
-                        // }
-
+    
                         vec3D bary = BaryCentricCoords(p, a.vertices[0], a.vertices[1], a.vertices[2]);
                         // Interpolate depth using barycentric coordinates
                         float depth = bary.x * t.vertices[0].z + 
@@ -236,12 +228,10 @@ bool EngineBackend::ConstructConsole(){
                         if(depth_buffer[y*screen_width+x]>depth){
                             depth_buffer[y*screen_width+x]=depth;
                             color_buffer[y*screen_width+x] = color_pair;
-                            // PutPixel(x, y, '*');
                         }
                     }
                 }   
             }
-            // attroff(COLOR_PAIR(color_pair));
         }
 
 
@@ -357,13 +347,6 @@ bool EngineBackend::ConstructConsole(){
                     } else {
                         std::cerr << "Warning: Invalid face on line " << line_number << std::endl;
                     }
-
-                    // iss >> x >> y >> z;
-                    // // std::cout<<x-1<<" x";
-
-                    // std::cout<<y-1<<" y";
-                    // triangle tri ={vertice_data[x-1],vertice_data[y-1],vertice_data[z-1]};
-                    // triangle_data.push_back(tri);
                 }
             }
             return triangle_data;
@@ -415,6 +398,11 @@ bool EngineBackend::ConstructConsole(){
         vec3D EngineBackend::Vector_Sub(vec3D& v1, vec3D& v2)
         {
             return {v1.x-v2.x, v1.y-v2.y, v1.z-v2.z};
+        }
+
+        vec3D EngineBackend::Vector_Div(vec3D &v1, float k)
+        {
+            return { v1.x / k, v1.y / k, v1.z / k };
         }
 
 
@@ -537,144 +525,311 @@ bool EngineBackend::ConstructConsole(){
         }
 
         void EngineBackend::Clipping(triangle tri){
-            std::deque<triangle> tqueue;
-            tqueue.push_back(tri);
-            Plane_Clipping(left_plane,tqueue);
-            Plane_Clipping(right_plane,tqueue);
-            Plane_Clipping(top_plane,tqueue);
-            Plane_Clipping(bottom_plane, tqueue);
-            Plane_Clipping(near_plane, tqueue);
-            Plane_Clipping(far_plane, tqueue);
+            triangle clipped[2];
+			std::deque<triangle> listTriangles;
+            int nNewTriangles = 1;
+            listTriangles.push_back(tri);
 
-            for(auto a: tqueue){
+            for (int p = 0; p < 4; p++)
+			{
+				int nTrisToAdd = 0;
+				while (nNewTriangles > 0)
+				{
+					// Take triangle from front of queue
+					triangle test = listTriangles.front();
+					listTriangles.pop_front();
+					nNewTriangles--;
+
+		
+					switch (p)
+					{
+					case 0:	nTrisToAdd = Triangle_ClipAgainstPlane({ 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, test, clipped[0], clipped[1]); break;
+					case 1:	nTrisToAdd = Triangle_ClipAgainstPlane({ 0.0f, (float)screen_height - 1, 0.0f }, { 0.0f, -1.0f, 0.0f }, test, clipped[0], clipped[1]); break;
+					case 2:	nTrisToAdd = Triangle_ClipAgainstPlane({ 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f }, test, clipped[0], clipped[1]); break;
+					case 3:	nTrisToAdd = Triangle_ClipAgainstPlane({ (float)screen_width - 1, 0.0f, 0.0f }, { -1.0f, 0.0f, 0.0f }, test, clipped[0], clipped[1]); break;
+                    default: break;
+					}
+
+					for (int w = 0; w < nTrisToAdd; w++)
+						listTriangles.push_back(clipped[w]);
+				}
+				nNewTriangles = listTriangles.size();
+			}
+
+
+            for(auto a: listTriangles){
                 global_tqueue.push_back(a);
             }
         }
 
-        void EngineBackend::Plane_Clipping(vec3D plane, std::deque<triangle>& tqueue){
-            std::vector<vec3D> vqueue;
-            triangle tri;
-            int que_len = tqueue.size();
-            while (que_len>0){
+        // void EngineBackend::Plane_Clipping(vec3D plane, std::deque<triangle>& tqueue){
+        //     std::vector<vec3D> vqueue;
+        //     triangle tri;
+        //     int que_len = tqueue.size();
+        //     while (que_len>0){
     
-                tri = tqueue.back();
-                tqueue.pop_back();
-                que_len--;
+        //         tri = tqueue.back();
+        //         tqueue.pop_back();
+        //         que_len--;
     
-                vec3D a = tri.vertices[0];
-                vec3D b = tri.vertices[1];
-                vec3D c = tri.vertices[2];
+        //         vec3D a = tri.vertices[0];
+        //         vec3D b = tri.vertices[1];
+        //         vec3D c = tri.vertices[2];
 
-                //point infront of the plane
-                if(a.x*plane.x + a.y*plane.y +  a.z*plane.z + plane.w <= 0){
-                    vqueue.push_back(a);
-                }
-                //check if point of intersection exists
-                vec3D AB_dir = Vector_Sub(a,b);
-                vec3D poi = Vector_Intersect_Plane(plane,AB_dir,a);
-                if(poi.x==0 && poi.y==0 && poi.z==0){  }
-                else{
-                    vqueue.push_back(poi);
-                }
+        //         bool flag_a = false;
+        //         bool flag_b = false;
+        //         bool flag_c = false;
 
-                if(b.x*plane.x + b.y*plane.y +  b.z*plane.z + plane.w <= 0){
-                    vqueue.push_back(b);
-                }
-                //check if point of intersection exists
-                vec3D BC = Vector_Sub(b,c);
-                poi = Vector_Intersect_Plane(plane,BC,b);
-                if(poi.x==0 && poi.y==0 && poi.z==0){}
-                else{
-                    vqueue.push_back(poi);
-                }
 
-                if(c.x*plane.x + c.y*plane.y +  c.z*plane.z + plane.w <= 0){
-                    vqueue.push_back(c);
-                }
-                //check if point of intersection exists
-                vec3D CA = Vector_Sub(c,a);
-                poi = Vector_Intersect_Plane(plane,CA,c);
-                if(poi.x==0 && poi.y==0 && poi.z==0){}
-                else{
-                    vqueue.push_back(poi);
-                }
+                
+        //         //check if point a infront of the plane
+        //         if(a.x*plane.x + a.y*plane.y +  a.z*plane.z + plane.w < 0){
+        //             flag_a = true;
+        //         }
 
-                if(vqueue.size()==4){
-                    triangle t1 = {vqueue[0],vqueue[1], vqueue[2]};
-                    triangle t2 = {vqueue[0],vqueue[2], vqueue[3]};
-                    tqueue.push_back(t1);
-                    tqueue.push_back(t2);
-                }
+        //         if(b.x*plane.x + b.y*plane.y +  b.z*plane.z + plane.w < 0){
+        //             flag_b = true;
+        //         }
+        //         if(c.x*plane.x + c.y*plane.y +  c.z*plane.z + plane.w < 0){
+        //             flag_c = true;
 
-                if(vqueue.size()==3){
-                    triangle t1 = {vqueue[0],vqueue[1], vqueue[2]};
-                    tqueue.push_back(t1);
-                }
-                vqueue.clear();
-            }
+        //         }
 
-        }
+        //         // if(plane.x==near_plane.x && plane.y==near_plane.y && plane.z==near_plane.z && plane.w==near_plane.w){
+        //             // flag_a = !flag_a;
+        //             // flag_b = !flag_b;
+        //             // flag_c = !flag_c;
+        //         // } 
+                
+
+                
+  
+
+        //         if(flag_a){
+        //             vqueue.push_back(a);
+        //         }
+        //         if((!flag_a && flag_b) || (flag_a && !flag_b) ){
+        //             vec3D AB_dir = Vector_Sub(a,b);
+        //             vec3D poi = Vector_Intersect_Plane(plane,AB_dir,a);
+        //             if(poi.x==0 && poi.y==0 && poi.z==0){  }
+        //             else{
+        //                 vqueue.push_back(poi);
+        //             }
+        //         }
+
+        //         if(flag_b){
+        //             vqueue.push_back(b);
+        //         }
+        //         if((!flag_b && flag_c) || (flag_b && !flag_c) ){
+          
+        //             vec3D BC_dir = Vector_Sub(b,c);
+        //             vec3D poi = Vector_Intersect_Plane(plane,BC_dir,b);
+        //             if(poi.x==0 && poi.y==0 && poi.z==0){  }
+        //             else{
+        //                 vqueue.push_back(poi);
+        //             }
+        
+        //         }
+
+
+        //         if(flag_c){
+        //             vqueue.push_back(c);
+        //         }
+        //         if((!flag_a && flag_c) || (flag_a && !flag_c) ){
+        //             vec3D CA_dir = Vector_Sub(c,a);
+        //             vec3D poi = Vector_Intersect_Plane(plane,CA_dir,c);
+        //             if(poi.x==0 && poi.y==0 && poi.z==0){  }
+        //             else{
+        //                 vqueue.push_back(poi);
+        //             }
+        //         }
+
+
+        //         if(vqueue.size()==3){
+        //             triangle t1 = {vqueue[0],vqueue[1], vqueue[2]};
+        //             tqueue.push_back(t1);
+        //         }
+
+
+        //          if(vqueue.size()==4){
+        //             triangle t1 = {vqueue[0],vqueue[1], vqueue[2]};
+        //             triangle t2 = {vqueue[0],vqueue[2], vqueue[3]};
+        //             tqueue.push_back(t1);
+        //             tqueue.push_back(t2);
+        //         }
+
+        //         vqueue.clear();
+        //     }
+
+        // }
+        
 
         void EngineBackend::Generate_Planes(mat4x4 matCamera){
-            mat4x4 view_proj = Matrix_MultiplyMatrix(proj, matCamera);
+            mat4x4 view_proj = Matrix_MultiplyMatrix(matCamera, proj );
             vec3D w_val = {view_proj.m[3][0],view_proj.m[3][1],view_proj.m[3][2],view_proj.m[3][3]};
             vec3D x_val = {view_proj.m[0][0],view_proj.m[0][1],view_proj.m[0][2],view_proj.m[0][3]};
             vec3D y_val = {view_proj.m[1][0],view_proj.m[1][1],view_proj.m[1][2],view_proj.m[1][3]};
             vec3D z_val = {view_proj.m[2][0],view_proj.m[2][1],view_proj.m[2][2],view_proj.m[2][3]};
 
+            
+
             left_plane  = Vector_Add(w_val,x_val);
+            float length = sqrt(left_plane.x*left_plane.x + left_plane.y*left_plane.y + left_plane.z*left_plane.z);
+            left_plane.x /= length;
+            left_plane.y /= length;
+            left_plane.z /= length;
+            left_plane.w /= length;
+
             right_plane  = Vector_Sub(w_val,x_val);
+            length = sqrt(right_plane.x*right_plane.x + right_plane.y*right_plane.y + right_plane.z*right_plane.z);
+            right_plane.x /= length;
+            right_plane.y /= length;
+            right_plane.z /= length;
+            right_plane.w /= length;
 
             top_plane  = Vector_Add(w_val,y_val);
+            length = sqrt(top_plane.x*top_plane.x + top_plane.y*top_plane.y + top_plane.z*top_plane.z);
+            top_plane.x /= length;
+            top_plane.y /= length;
+            top_plane.z /= length;
+            top_plane.w /= length;
+
             bottom_plane  = Vector_Sub(w_val,y_val);
+            length = sqrt(bottom_plane.x*bottom_plane.x + bottom_plane.y*bottom_plane.y + bottom_plane.z*bottom_plane.z);
+            bottom_plane.x /= length;
+            bottom_plane.y /= length;
+            bottom_plane.z /= length;
+            bottom_plane.w /= length;
             
             far_plane  = Vector_Add(w_val,z_val);
+            length = sqrt(far_plane.x*far_plane.x + far_plane.y*far_plane.y + far_plane.z*far_plane.z);
+            far_plane.x /= length;
+            far_plane.y /= length;
+            far_plane.z /= length;
+            far_plane.w /= length;
+
             near_plane  = Vector_Sub(w_val,z_val);
+            length = sqrt(near_plane.x*near_plane.x + near_plane.y*near_plane.y + near_plane.z*near_plane.z);
+            near_plane.x /= length;
+            near_plane.y /= length;
+            near_plane.z /= length;
+            near_plane.w /= length;
         }
 
-        vec3D EngineBackend::Vector_Intersect_Plane(vec3D plane, vec3D vector, vec3D point){
-            float x, y, z, w;
-            x = plane.x;
-            y = plane.y;
-            z = plane.z;
-            w = plane.w;
+       
 
-            vec3D plane_normal = {plane.x, plane.y, plane.z};
+        vec3D EngineBackend::Vector_Normalise(vec3D &v)
+        {
+            float l = Vector_Length(v);
+            return { v.x / l, v.y / l, v.z / l };
+        }
 
-            if(dot(plane_normal, vector)==0){
-                return {0,0,0};
+        float EngineBackend::Vector_Length(vec3D &v)
+        {
+            return sqrtf(dot(v, v));
+	    }
+
+
+        vec3D EngineBackend::Vector_IntersectPlane(vec3D &plane_p, vec3D &plane_n, vec3D &lineStart, vec3D &lineEnd)
+        {
+            plane_n = Vector_Normalise(plane_n);
+            float plane_d = -dot(plane_n, plane_p);
+            float ad = dot(lineStart, plane_n);
+            float bd = dot(lineEnd, plane_n);
+            float t = (-plane_d - ad) / (bd - ad);
+            vec3D lineStartToEnd = Vector_Sub(lineEnd, lineStart);
+            vec3D lineToIntersect = Vector_Mul(lineStartToEnd, t);
+            return Vector_Add(lineStart, lineToIntersect);
+        }
+
+        int EngineBackend::Triangle_ClipAgainstPlane(vec3D plane_p, vec3D plane_n, triangle &in_tri, triangle &out_tri1, triangle &out_tri2)
+        {
+            // Make sure plane normal is indeed normal
+            plane_n = Vector_Normalise(plane_n);
+
+            // Return signed shortest distance from point to plane, plane normal must be normalised
+            auto dist = [&](vec3D &p)
+            {
+                vec3D n = Vector_Normalise(p);
+                return (plane_n.x * p.x + plane_n.y * p.y + plane_n.z * p.z - dot(plane_n, plane_p));
+            };
+
+            // Create two temporary storage arrays to classify points either side of plane
+            // If distance sign is positive, point lies on "inside" of plane
+            vec3D* inside_points[3];  int nInsidePointCount = 0;
+            vec3D* outside_points[3]; int nOutsidePointCount = 0;
+
+            // Get signed distance of each point in triangle to plane
+            float d0 = dist(in_tri.vertices[0]);
+            float d1 = dist(in_tri.vertices[1]);
+            float d2 = dist(in_tri.vertices[2]);
+
+            if (d0 >= 0) { inside_points[nInsidePointCount++] = &in_tri.vertices[0]; }
+            else { outside_points[nOutsidePointCount++] = &in_tri.vertices[0]; }
+            if (d1 >= 0) { inside_points[nInsidePointCount++] = &in_tri.vertices[1]; }
+            else { outside_points[nOutsidePointCount++] = &in_tri.vertices[1]; }
+            if (d2 >= 0) { inside_points[nInsidePointCount++] = &in_tri.vertices[2]; }
+            else { outside_points[nOutsidePointCount++] = &in_tri.vertices[2]; }
+
+            // Now classify triangle points, and break the input triangle into 
+            // smaller output triangles if required. There are four possible
+            // outcomes...
+
+            if (nInsidePointCount == 0)
+            {
+                // All points lie on the outside of plane, so clip whole triangle
+                // It ceases to exist
+
+                return 0; // No returned triangles are valid
             }
-            // float tmp = (w -(plane_normal.x*point.x + plane_normal.y*point.y + plane_normal.z*point.z)) /(plane_normal.x*vector.x + plane_normal.y*vector.y + plane_normal.z*vector.z);
-            float tmp = (-w - dot(plane_normal, point)) / dot(plane_normal, vector);
-            vec3D poi;
-            poi.x = (point.x + vector.x*tmp);
-            poi.y = (point.y + vector.y*tmp);
-            poi.z = (point.z + vector.z*tmp);
 
-            return poi;
+            if (nInsidePointCount == 3)
+            {
+                // All points lie on the inside of plane, so do nothing
+                // and allow the triangle to simply pass through
+                out_tri1 = in_tri;
+
+                return 1; // Just the one returned original triangle is valid
+            }
+
+            if (nInsidePointCount == 1 && nOutsidePointCount == 2)
+            {
+                // Triangle should be clipped. As two points lie outside
+                // the plane, the triangle simply becomes a smaller triangle
+
+                
+                // The inside point is valid, so keep that...
+                out_tri1.vertices[0] = *inside_points[0];
+
+                // but the two new points are at the locations where the 
+                // original sides of the triangle (lines) intersect with the plane
+                out_tri1.vertices[1] = Vector_IntersectPlane(plane_p, plane_n, *inside_points[0], *outside_points[0]);
+                out_tri1.vertices[2] = Vector_IntersectPlane(plane_p, plane_n, *inside_points[0], *outside_points[1]);
+
+                return 1; // Return the newly formed single triangle
+            }
+
+            if (nInsidePointCount == 2 && nOutsidePointCount == 1)
+            {
+                // Triangle should be clipped. As two points lie inside the plane,
+                // the clipped triangle becomes a "quad". Fortunately, we can
+                // represent a quad with two new triangles
+
+
+                // The first triangle consists of the two inside points and a new
+                // point determined by the location where one side of the triangle
+                // intersects with the plane
+                out_tri1.vertices[0] = *inside_points[0];
+                out_tri1.vertices[1] = *inside_points[1];
+                out_tri1.vertices[2] = Vector_IntersectPlane(plane_p, plane_n, *inside_points[0], *outside_points[0]);
+
+                // The second triangle is composed of one of he inside points, a
+                // new point determined by the intersection of the other side of the 
+                // triangle and the plane, and the newly created point above
+                out_tri2.vertices[0] = *inside_points[1];
+                out_tri2.vertices[1] = out_tri1.vertices[2];
+                out_tri2.vertices[2] = Vector_IntersectPlane(plane_p, plane_n, *inside_points[1], *outside_points[0]);
+
+                return 2; // Return two newly formed triangles which form a quad
+            }
         }
-
-
-        //pseudocode
-        //check if a point is behind or infront of a plane
-            //if infront it passes and gets added to the list
-            //if behind it does not get added to the list 
-            //Use the vector intersect fucntion to see if the vector of A and B intersect with the plane
-            //if it does, add the vector
-
-        //check if the vector in each tri intresects the plane
-
-        //if none of the vectors intersect
-            //sub a point of the vector inside the plane equation and check the result
-            //if it less than 0, it is behind the plan e 
-
-        //if the vector intersects
-            //get the new coords of the intersection
-            //if number of intersections == 2, 
-
-        
-
-            
-
-        //after first intersection with the plane
-        // 

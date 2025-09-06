@@ -79,6 +79,7 @@ class Engine3D: public EngineBackend{
            
 
             Clear_Buffers();
+            global_tqueue.clear();
             mat4x4 matRotZ, matRotX;
             //fTheta += 1.0f * fElapsedTime; // Uncomment to spin around
             matRotZ = Matrix_MakeRotationZ(fTheta * 0.5f);
@@ -94,21 +95,28 @@ class Engine3D: public EngineBackend{
 
             vec3D vTarget = {0,0,1};
 
-            mat4x4 matCameraRot = Matrix_MakeRotationY(fYaw );
-            vlookDir = Matrix_MultiplyVector(matCameraRot, vTarget);
+            mat4x4 matCameraRotP = Matrix_MakeRotationX(fPitch);
+            vlookDir = Matrix_MultiplyVector(matCameraRotP, vTarget);
+
+            // Then apply yaw (around world Y-axis)
+            mat4x4 matCameraRotY = Matrix_MakeRotationY(fYaw);
+            vlookDir = Matrix_MultiplyVector(matCameraRotY, vlookDir);
+
+
+
             vTarget = Vector_Add(camera, vlookDir);
             mat4x4 matCamera = pointAt(camera, vTarget, vup);
-            Generate_Planes(matCamera);
 
 
             // Make view matrix from camera
             mat4x4 matView = Matrix_QuickInverse(matCamera);
+            // Generate_Planes(matView);
 
             // Store triagles for rastering later
             vector<triangle> vecTrianglesToRaster;
             for (auto tri : mesh.tris)
             {
-                triangle triProjected, triTranslated, triViewed, triWorldSpace;
+                triangle  triViewed, triWorldSpace;
 
 
                 
@@ -123,200 +131,135 @@ class Engine3D: public EngineBackend{
                 MultiplyMatrixVector(triWorldSpace.vertices[1], triViewed.vertices[1], matView);
                 MultiplyMatrixVector(triWorldSpace.vertices[2], triViewed.vertices[2], matView);
 
-                           
-                // // Offset into the screen
-                triTranslated = triViewed;
-                triTranslated.vertices[0].z = triTranslated.vertices[0].z + 8.0f;
-                triTranslated.vertices[1].z = triTranslated.vertices[1].z + 8.0f;
-                triTranslated.vertices[2].z = triTranslated.vertices[2].z + 8.0f;
-                
-                Clipping(triTranslated);
-                
+               
 
-                vec3D normal, line1, line2;
-                line1.x = triTranslated.vertices[0].x - triTranslated.vertices[1].x;
-                line1.y = triTranslated.vertices[0].y - triTranslated.vertices[1].y;
-                line1.z = triTranslated.vertices[0].z - triTranslated.vertices[1].z;
+                triangle clipped[2];
+                int clipped_tris = Triangle_ClipAgainstPlane({ 0.0f, 0.0f, 0.01f }, { 0.0f, 0.0f, 1.0f }, triViewed, clipped[0], clipped[1]);
+                for (int n = 0; n < clipped_tris; n++)
+				{
+                    triangle triProjected;
+                    triTranslated = clipped[n];
+      
+                    vec3D line1, line2;
+                    line1.x = triTranslated.vertices[0].x - triTranslated.vertices[1].x;
+                    line1.y = triTranslated.vertices[0].y - triTranslated.vertices[1].y;
+                    line1.z = triTranslated.vertices[0].z - triTranslated.vertices[1].z;
 
-                line2.x = triTranslated.vertices[0].x - triTranslated.vertices[2].x;
-                line2.y = triTranslated.vertices[0].y - triTranslated.vertices[2].y;
-                line2.z = triTranslated.vertices[0].z - triTranslated.vertices[2].z;
+                    line2.x = triTranslated.vertices[0].x - triTranslated.vertices[2].x;
+                    line2.y = triTranslated.vertices[0].y - triTranslated.vertices[2].y;
+                    line2.z = triTranslated.vertices[0].z - triTranslated.vertices[2].z;
 
-                //cross product
-                normal.x = line1.y * line2.z - line1.z * line2.y; // Cx
-                normal.y = line1.z * line2.x - line1.x * line2.z; // Cy
-                normal.z = line1.x * line2.y - line1.y * line2.x; // Cz
+                    //cross product
+                    normal.x = line1.y * line2.z - line1.z * line2.y; // Cx
+                    normal.y = line1.z * line2.x - line1.x * line2.z; // Cy
+                    normal.z = line1.x * line2.y - line1.y * line2.x; // Cz
+                    
+                    //normalize
+                    float magnitude = sqrtf(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
+                    if (magnitude > 0.0f) { // Avoid division by zero for zero vectors
+                        normal.x /= magnitude;
+                        normal.y /= magnitude;  
+                        normal.z /= magnitude;
+                    }
+
+                    if(((normal.x*(triTranslated.vertices[0].x-vlookDir.x)) + (normal.y*(triTranslated.vertices[0].y - vlookDir.y))
+                        + (normal.z*(triTranslated.vertices[0].z- vlookDir.z)))>0.0f){
+                            continue;
+                    }
+
+                   
+                    // Project triangles from 3D --> 2D
+                    MultiplyMatrixVector(triTranslated.vertices[0], triProjected.vertices[0], proj);
+                    MultiplyMatrixVector(triTranslated.vertices[1], triProjected.vertices[1], proj);
+                    MultiplyMatrixVector(triTranslated.vertices[2], triProjected.vertices[2], proj);
+
+                    triProjected.vertices[0] = Vector_Div(triProjected.vertices[0], triProjected.vertices[0].w);
+                    triProjected.vertices[1] = Vector_Div(triProjected.vertices[1], triProjected.vertices[1].w);
+                    triProjected.vertices[2] = Vector_Div(triProjected.vertices[2], triProjected.vertices[2].w);
+
+                    triProjected.vertices[0].x *= -1.0f;
+                    triProjected.vertices[1].x *= -1.0f;
+                    triProjected.vertices[2].x *= -1.0f;
+                    triProjected.vertices[0].y *= -1.0f;
+                    triProjected.vertices[1].y *= -1.0f;
+                    triProjected.vertices[2].y *= -1.0f;
+
+                    vec3D vOffsetView = { 1,1,0 };
+					triProjected.vertices[0] = Vector_Add(triProjected.vertices[0], vOffsetView);
+					triProjected.vertices[1] = Vector_Add(triProjected.vertices[1], vOffsetView);
+					triProjected.vertices[2] = Vector_Add(triProjected.vertices[2], vOffsetView);
+                    // Scale into view
+                    triProjected.vertices[0].x *= 0.5f * (float)screen_width;
+                    triProjected.vertices[0].y *= 0.5f * (float)screen_height;
+                    triProjected.vertices[1].x *= 0.5f* (float)screen_width;
+                    triProjected.vertices[1].y *= 0.5f * (float)screen_height;
+                    triProjected.vertices[2].x *= 0.5f * (float)screen_width;
+                    triProjected.vertices[2].y *= 0.5f * (float)screen_height;
+
+                    triangle clipped[2];
+                    std::deque<triangle> listTriangles;
+                    int nNewTriangles = 1;
+                    listTriangles.push_back(triProjected);
+
+                    for (int p = 0; p < 4; p++)
+                    {
+                        int nTrisToAdd = 0;
+                        while (nNewTriangles > 0)
+                        {
+                            // Take triangle from front of queue
+                            triangle test = listTriangles.front();
+                            listTriangles.pop_front();
+                            nNewTriangles--;
+
                 
-                //normalize
-                float magnitude = sqrtf(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
-                if (magnitude > 0.0f) { // Avoid division by zero for zero vectors
-                    normal.x /= magnitude;
-                    normal.y /= magnitude;  
-                    normal.z /= magnitude;
+                            switch (p)
+                            {
+                            case 0:	nTrisToAdd = Triangle_ClipAgainstPlane({ 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, test, clipped[0], clipped[1]); break;
+                            case 1:	nTrisToAdd = Triangle_ClipAgainstPlane({ 0.0f, (float)screen_height - 1, 0.0f }, { 0.0f, -1.0f, 0.0f }, test, clipped[0], clipped[1]); break;
+                            case 2:	nTrisToAdd = Triangle_ClipAgainstPlane({ 0.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f }, test, clipped[0], clipped[1]); break;
+                            case 3:	nTrisToAdd = Triangle_ClipAgainstPlane({ (float)screen_width - 1, 0.0f, 0.0f }, { -1.0f, 0.0f, 0.0f }, test, clipped[0], clipped[1]); break;
+                            default: break;
+                            }
+
+                            for (int w = 0; w < nTrisToAdd; w++)
+                                listTriangles.push_back(clipped[w]);
+                        }
+                        nNewTriangles = listTriangles.size();
+                    }
+
+                    for(auto tri: listTriangles){
+                        DrawTriangle(tri.vertices[0].x, tri.vertices[0].y,
+                        tri.vertices[1].x, tri.vertices[1].y,
+                        tri.vertices[2].x, tri.vertices[2].y, tri,triTranslated);
+
+                        RasterizeTriangle_EdgeFunction(normal,illumination,tri, triTranslated);
+                    }
                 }
-
-                //since this works with >0.0f, this means: origin ...  object ... me 
-                if(((normal.x*triTranslated.vertices[0].x) + (normal.y*triTranslated.vertices[0].y)
-                    + (normal.z*triTranslated.vertices[0].z))>0.0f){
-                        continue;
-                }
-
-                // normalize illumination
-                magnitude = sqrtf((illumination.x-camera.x) * (illumination.x-camera.x) + (illumination.y - camera.y) * (illumination.y - camera.y) + (illumination.z - camera.z) * (illumination.z - camera.z));
-                if (magnitude > 0.0f) { // Avoid division by zero for zero vectors
-                    illumination.x /= magnitude;
-                    illumination.y /= magnitude;
-                    illumination.z /= magnitude;
-                }  
-
-
-
-                // Project triangles from 3D --> 2D
-                MultiplyMatrixVector(triTranslated.vertices[0], triProjected.vertices[0], proj);
-                MultiplyMatrixVector(triTranslated.vertices[1], triProjected.vertices[1], proj);
-                MultiplyMatrixVector(triTranslated.vertices[2], triProjected.vertices[2], proj);
-
-                // MultiplyMatrixVector(tri.vertices[0], triProjected.vertices[0], proj->m);
-                // MultiplyMatrixVector(tri.vertices[1], triProjected.vertices[1], proj->m);
-                // MultiplyMatrixVector(tri.vertices[2], triProjected.vertices[2], proj->m);
-
-                // Scale into view
-                triProjected.vertices[0].x += 1.0f; triProjected.vertices[0].y += 1.0f;
-                triProjected.vertices[1].x += 1.0f; triProjected.vertices[1].y += 1.0f;
-                triProjected.vertices[2].x += 1.0f; triProjected.vertices[2].y += 1.0f;
-                triProjected.vertices[0].x *= 0.5f * (float)screen_width;
-                triProjected.vertices[0].y *= 0.5f * (float)screen_height;
-                triProjected.vertices[1].x *= 0.5f* (float)screen_width;
-                triProjected.vertices[1].y *= 0.5f * (float)screen_height;
-                triProjected.vertices[2].x *= 0.5f * (float)screen_width;
-                triProjected.vertices[2].y *= 0.5f * (float)screen_height;
-
-                // Rasterize triangle
-                DrawTriangle(triProjected.vertices[0].x, triProjected.vertices[0].y,
-                    triProjected.vertices[1].x, triProjected.vertices[1].y,
-                    triProjected.vertices[2].x, triProjected.vertices[2].y, triProjected,triTranslated);
-
-                RasterizeTriangle_EdgeFunction(normal,illumination,triProjected, triTranslated);
             }
-            // for (auto tri : mesh.tris)
-            // {
-            //     // triangle triProjected, triTranslated, triViewed, triWorldSpace;
-
-            //     triangle triProjected, triTranslated, triRotatedZ,  triRotatedZX;
-
-            //     // mat4x4 worldViewMatrix = Matrix_MultiplyMatrix(look_at, matWorld); // Note: look_at first!
-            //     // MultiplyMatrixVector(tri.vertices[0], triViewed.vertices[0], worldViewMatrix.m);
-            //     // MultiplyMatrixVector(tri.vertices[1], triViewed.vertices[1], worldViewMatrix.m);
-            //     // MultiplyMatrixVector(tri.vertices[2], triViewed.vertices[2], worldViewMatrix.m);
-
-            //     // // Step 1: Transform to world space
-            //     // MultiplyMatrixVector(tri.vertices[0], triWorldSpace.vertices[0], matWorld.m);
-            //     // MultiplyMatrixVector(tri.vertices[1], triWorldSpace.vertices[1], matWorld.m);
-            //     // MultiplyMatrixVector(tri.vertices[2], triWorldSpace.vertices[2], matWorld.m);
-
-            //     // // Step 2: Transform to view space
-            //     // MultiplyMatrixVector(triWorldSpace.vertices[0], triViewed.vertices[0], look_at.m);
-            //     // MultiplyMatrixVector(triWorldSpace.vertices[1], triViewed.vertices[1], look_at.m);
-            //     // MultiplyMatrixVector(triWorldSpace.vertices[2], triViewed.vertices[2], look_at.m);
-
-            //     // Rotate in Z-Axis
-            //     MultiplyMatrixVector(tri.vertices[0], triRotatedZ.vertices[0], matRotZ.m);
-            //     MultiplyMatrixVector(tri.vertices[1], triRotatedZ.vertices[1], matRotZ.m);
-            //     MultiplyMatrixVector(tri.vertices[2], triRotatedZ.vertices[2], matRotZ.m);
-
-            //     // Rotate in X-Axis
-            //     MultiplyMatrixVector(triRotatedZ.vertices[0], triRotatedZX.vertices[0], matRotX.m );
-            //     MultiplyMatrixVector(triRotatedZ.vertices[1], triRotatedZX.vertices[1], matRotX.m);
-            //     MultiplyMatrixVector(triRotatedZ.vertices[2], triRotatedZX.vertices[2], matRotX.m);
-
-            //     // // Offset into the screen
-            //     triTranslated = triRotatedZX;
-            //     triTranslated.vertices[0].z = triTranslated.vertices[0].z + 8.0f;
-            //     triTranslated.vertices[1].z = triTranslated.vertices[1].z + 8.0f;
-            //     triTranslated.vertices[2].z = triTranslated.vertices[2].z + 8.0f;
-
-            //     vec3D normal, line1, line2;
-            //     line1.x = triTranslated.vertices[0].x - triTranslated.vertices[1].x;
-            //     line1.y = triTranslated.vertices[0].y - triTranslated.vertices[1].y;
-            //     line1.z = triTranslated.vertices[0].z - triTranslated.vertices[1].z;
-
-            //     line2.x = triTranslated.vertices[0].x - triTranslated.vertices[2].x;
-            //     line2.y = triTranslated.vertices[0].y - triTranslated.vertices[2].y;
-            //     line2.z = triTranslated.vertices[0].z - triTranslated.vertices[2].z;
-
-            //     //cross product
-            //     normal.x = line1.y * line2.z - line1.z * line2.y; // Cx
-            //     normal.y = line1.z * line2.x - line1.x * line2.z; // Cy
-            //     normal.z = line1.x * line2.y - line1.y * line2.x; // Cz
-                
-            //     //normalize
-            //     float magnitude = sqrtf(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
-            //     if (magnitude > 0.0f) { // Avoid division by zero for zero vectors
-            //         normal.x /= magnitude;
-            //         normal.y /= magnitude;
-            //         normal.z /= magnitude;
-            //     }
-
-            //     //since this works with >0.0f, this means: origin ...  object ... me 
-            //     if(((normal.x*triTranslated.vertices[0].x) + (normal.y*triTranslated.vertices[0].y)
-            //         + (normal.z*triTranslated.vertices[0].z))>0.0f){
-            //             continue;
-            //     }
-
-            //     // normalize illumination
-            //     magnitude = sqrtf(illumination.x * illumination.x + illumination.y * illumination.y + illumination.z * illumination.z);
-            //     if (magnitude > 0.0f) { // Avoid division by zero for zero vectors
-            //         illumination.x /= magnitude;
-            //         illumination.y /= magnitude;
-            //         illumination.z /= magnitude;
-            //     }  
-
-
-
-            //     // Project triangles from 3D --> 2D
-            //     MultiplyMatrixVector(triTranslated.vertices[0], triProjected.vertices[0], proj->m);
-            //     MultiplyMatrixVector(triTranslated.vertices[1], triProjected.vertices[1], proj->m);
-            //     MultiplyMatrixVector(triTranslated.vertices[2], triProjected.vertices[2], proj->m);
-
-            //     // MultiplyMatrixVector(tri.vertices[0], triProjected.vertices[0], proj->m);
-            //     // MultiplyMatrixVector(tri.vertices[1], triProjected.vertices[1], proj->m);
-            //     // MultiplyMatrixVector(tri.vertices[2], triProjected.vertices[2], proj->m);
-
-            //     // Scale into view
-            //     triProjected.vertices[0].x += 1.0f; triProjected.vertices[0].y += 1.0f;
-            //     triProjected.vertices[1].x += 1.0f; triProjected.vertices[1].y += 1.0f;
-            //     triProjected.vertices[2].x += 1.0f; triProjected.vertices[2].y += 1.0f;
-            //     triProjected.vertices[0].x *= 0.5f * (float)screen_width;
-            //     triProjected.vertices[0].y *= 0.5f * (float)screen_height;
-            //     triProjected.vertices[1].x *= 0.5f* (float)screen_width;
-            //     triProjected.vertices[1].y *= 0.5f * (float)screen_height;
-            //     triProjected.vertices[2].x *= 0.5f * (float)screen_width;
-            //     triProjected.vertices[2].y *= 0.5f * (float)screen_height;
-
-            //     // Rasterize triangle
-            //     DrawTriangle(triProjected.vertices[0].x, triProjected.vertices[0].y,
-            //         triProjected.vertices[1].x, triProjected.vertices[1].y,
-            //         triProjected.vertices[2].x, triProjected.vertices[2].y, triProjected,triTranslated);
-
-            //     RasterizeTriangle_EdgeFunction(normal,illumination,triProjected, triTranslated);
-            // }
+           
             Render();
             
             int ch;
             ch = getch();
             if (ch != ERR) {
+                clear();
+                vec3D vForward = Vector_Mul(vlookDir, 400.0f * fElapsedTime);
                 if ((char)ch == 'w') {
-                    camera.z += 400.0f * fElapsedTime;
+                    camera = Vector_Add(vForward,camera);
                 }
                 if ((char)ch == 's') {
-                    camera.z -= 400.0f* fElapsedTime;
+                    camera = Vector_Sub(camera,vForward);
                 }
+
+
                 if ((char)ch == 'a') {
                     camera.x += 400.0f* fElapsedTime;
                 }
                 if ((char)ch == 'd') {
                     camera.x -= 400.0f* fElapsedTime;
                 }
+
+
                 //yaw
                 if ((char)ch == 't') {
                     fYaw += 100.0f* fElapsedTime;
@@ -325,15 +268,24 @@ class Engine3D: public EngineBackend{
                     fYaw -= 100.0f* fElapsedTime;
                 }
 
-                //pitch
-                vec3D vForward = Vector_Mul(vlookDir, 400.0f * fElapsedTime);
+                //move up
+                if ((char)ch == 'u') {
+                    camera.y += 400.0f* fElapsedTime;
+                }
                 if ((char)ch == 'j') {
-                    camera = Vector_Add(vForward,camera);
+                    camera.y -= 400.0f* fElapsedTime;
                 }
-                if ((char)ch == 'n') {
-                     camera = Vector_Sub(camera,vForward);
-                    // vlookDir.y -= 400.0f* fElapsedTime;
+
+
+                //pitch
+                if ((char)ch == 'p') {
+                    fPitch += 100.0f* fElapsedTime;
                 }
+                if ((char)ch == 'l') {
+                    fPitch -= 100.0f* fElapsedTime;
+                }
+
+                
             }
 
 
@@ -348,11 +300,14 @@ class Engine3D: public EngineBackend{
     private:
         Mesh mesh;
         float fTheta;
-        vec3D illumination= {0.0f, 0.0f, -1.0f};
+        vec3D illumination=  { 0.0f, 1.0f, -1.0f };
+        vec3D normal;
         vec3D vlookDir = {0.0f, 0.0f, 1.0f};
         vec3D vup = {0.0f,1.0f,0.0f};
-        vec3D camera = {0.0f,0.0f, 3.0f} ;
+        vec3D camera = {0.0f,0.0f, 0.0f} ;
         float fYaw = 0;
+        float fPitch = 0;
+        triangle triTranslated;
 
 
 };
