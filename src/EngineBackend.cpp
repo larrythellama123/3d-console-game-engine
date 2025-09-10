@@ -1,7 +1,5 @@
 #include "EngineBackend.hpp"
 #include <iostream>
-
-
 //issues:
 // triangles drawn behind other triangles
 //depth buffer - z depth of plane if there is another 
@@ -30,7 +28,7 @@ bool EngineBackend::ConstructConsole(){
             screen_height = height;
             depth_buffer.resize(width * height, std::numeric_limits<float>::max());
             color_buffer.resize(width * height, -1);
-
+            image = cv::imread("../cottage_diffuse.png", cv::IMREAD_COLOR); // Load the image
             ConstructProjectionMatrix();    
             return true;
         };
@@ -119,7 +117,6 @@ bool EngineBackend::ConstructConsole(){
                         if(depth_buffer[y*screen_width+x]>depth){
                             depth_buffer[y*screen_width+x]=depth;
                             color_buffer[y*screen_width+x] = 9;
-                            // PutPixel(x, y, '*');
                         }
                         
                     }
@@ -139,6 +136,8 @@ bool EngineBackend::ConstructConsole(){
                     }
             }
         }
+
+
         void EngineBackend::Render(){
            
             for(int i=0; i<screen_width*screen_height; i++){
@@ -212,27 +211,82 @@ bool EngineBackend::ConstructConsole(){
                     p.x=x;
                     p.y=y;;
                     p.z=0;
-                    
                     int w0 = EdgeFunction(a.vertices[1], a.vertices[2], p);  // Edge BC
                     int w1 = EdgeFunction(a.vertices[2], a.vertices[0], p);  // Edge CA  
                     int w2 = EdgeFunction(a.vertices[0], a.vertices[1], p);  // Edge AB
 
                     if (w0 >= 0 && w1 >= 0 && w2 >= 0) {
     
+                        //represents the point as a weighted average of reference points(of vertices in projected space)
                         vec3D bary = BaryCentricCoords(p, a.vertices[0], a.vertices[1], a.vertices[2]);
                         // Interpolate depth using barycentric coordinates
                         float depth = bary.x * t.vertices[0].z + 
                                     bary.y * t.vertices[1].z + 
                                     bary.z * t.vertices[2].z;
 
+                        // Use original 3D Z coordinates of each vertex for perspective correction
+                        float inv_z0 = 1.0f / t.vertices[0].z;  // 1/Z for vertex 0
+                        float inv_z1 = 1.0f / t.vertices[1].z;  // 1/Z for vertex 1  
+                        float inv_z2 = 1.0f / t.vertices[2].z;  // 1/Z for vertex 2
+
+                        // Perspective-corrected UV interpolation
+                        float u_over_z = bary.x * (a.t[0].u * inv_z0) + 
+                                        bary.y * (a.t[1].u * inv_z1) + 
+                                        bary.z * (a.t[2].u * inv_z2);
+
+                        float v_over_z = bary.x * (a.t[0].v * inv_z0) + 
+                                        bary.y * (a.t[1].v * inv_z1) + 
+                                        bary.z * (a.t[2].v * inv_z2);
+
+
+                        float inv_z = bary.x * inv_z0 + bary.y * inv_z1 + bary.z * inv_z2;
+
+                        // Final perspective-corrected UV coordinates
+                        float u = (u_over_z / inv_z);
+                        float v = (v_over_z / inv_z);
+
                         if(depth_buffer[y*screen_width+x]>depth){
                             depth_buffer[y*screen_width+x]=depth;
-                            color_buffer[y*screen_width+x] = color_pair;
+                            color_buffer[y*screen_width+x] = Sample_PNG(u,v);
                         }
                     }
                 }   
             }
+    
         }
+
+
+
+        void EngineBackend::Scanline_Rasterize(vec3D normal, vec3D illum, triangle a,triangle t){
+            
+            //find highest y point in tri
+            if(a.vertices[1].y>a.vertices[0].y){
+
+            }
+
+            auto EdgeFunction = [](vec3D a, vec3D b, vec3D p) -> int { return (p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x); };
+
+
+            int color_pair = std::max(3,Illumination_calculation(normal, illum, t));
+
+            //imagine A vertice is at the top, B and C to its left and right
+            float dAB = a.vertices[1].x- a.vertices[0].x/a.vertices[1].y- a.vertices[0].y;
+            float dAC =  a.vertices[2].x- a.vertices[0].x/a.vertices[2].y- a.vertices[0].y;
+
+            vec3D point1, point2;
+            point1 = a.vertices[0];
+            point2 = a.vertices[0];
+            //point1 and point2 traverses for every step that y takes(1)
+            point1.x += dAB; 
+            point1.y += 1;
+
+            point2.x += dAC;
+            
+    
+        }
+
+
+
 
 
 
@@ -271,6 +325,41 @@ bool EngineBackend::ConstructConsole(){
             return result;
         }
 
+        vec2D EngineBackend::BaryCentricCoords_2D(vec2D p, vec2D a, vec2D b, vec2D c){
+            vec2D v0 = {c.u - a.u, c.v - a.v, 0};
+            vec2D v1 = {b.u - a.u, b.v - a.v, 0};
+            vec2D v2 = {p.u - a.u, p.v - a.v, 0};
+    
+
+            vec2D result = {0.0f,0.0f,0.0f};
+            float dot00 = v0.u * v0.u + v0.v * v0.v;
+            float dot01 = v0.u * v1.u + v0.v * v1.v;
+            float dot02 = v0.u * v2.u + v0.v * v2.v;
+            float dot11 = v1.u * v1.u + v1.v * v1.v;        
+            float dot12 = v1.u * v2.u + v1.v * v2.v;
+
+            // In matriu form:
+            // [v0.u v1.u] [u] [v2.u]
+            // [v0.v v1.v] [v] = [v2.v] 
+            float D_coeff =  v0.u * v1.v - v0.v * v1.u;
+
+            // In matrix form:
+            // [v2.x v1.u] [u] 
+            // [v2.v v1.v] [v]
+            float D_xmatrix = v2.u * v1.v - v2.v * v1.u;
+
+            // In matrix form:
+            // [v0.u v2.u] [u] 
+            // [v0.v v2.v] [v] 
+            float D_ymatrix = v2.v * v0.u - v2.u * v0.v;
+
+            float u =  D_xmatrix/D_coeff;
+            float v =  D_ymatrix/D_coeff;
+            float w = 1 -u - v;
+            result = {w,v,u};
+            return result;
+        }
+
        
         void EngineBackend::GetTerminalSize(int& width, int& height) {
             struct winsize w;
@@ -298,6 +387,7 @@ bool EngineBackend::ConstructConsole(){
         std::vector<triangle> EngineBackend::Read_File(std::string file_path){
             std::ifstream file(file_path); // Replace with your file path
             std::vector<vec3D> vertice_data;
+            std::vector<vec2D> texture_data;
             std::vector<triangle> triangle_data;
 
             triangle_data.reserve(300000); // Adjust based on expected size
@@ -315,36 +405,92 @@ bool EngineBackend::ConstructConsole(){
                 std::istringstream iss(line);
                 std::string prefix;
                 iss >> prefix;
+                if(prefix == "vt"){
+                    float u, v;
+                    iss >> u >> v;
+                    vec2D vector = {u,v,0};
+                    texture_data.push_back(vector);
+                }
                 if(prefix == "v"){
                     float x, y, z;
                     iss >> x >> y >> z;  
                     vec3D vector = {x,y,z};
                     vertice_data.push_back(vector);
                 }
+
                 if(prefix == "f"){
-                    int x, y, z;
-
+                    std::string x, y, z, w;
+                    //check if quad or tri 
                     if (iss >> x >> y >> z) {
+                        size_t first_slash = x.find('/');
+                        size_t second_slash = x.find('/', first_slash + 1);
+                        int v_idx1;
+                        int v_idx2;
+                        int v_idx3;
+                        int t_idx1;
+                        int t_idx2;
+                        int t_idx3;
 
+                        try{
+                            v_idx1 = std::stoi(x.substr(0, first_slash)) - 1;    
+                            t_idx1 = std::stoi(x.substr(first_slash + 1, second_slash - (first_slash + 1))) - 1;
 
-                        // Convert to 0-based indexing and check bounds
-                        int idx1 = x - 1;
-                        int idx2 = y - 1; 
-                        int idx3 = z - 1;
-                        
-                        // Bounds checking
-                        if (idx1 >= 0 && idx1 < vertice_data.size() &&
-                            idx2 >= 0 && idx2 < vertice_data.size() &&
-                            idx3 >= 0 && idx3 < vertice_data.size()) {
-                            
-                            triangle tri = {vertice_data[idx1], vertice_data[idx2], vertice_data[idx3]};
-                            triangle_data.push_back(tri);
-                        } else {
-                            std::cerr << "Error: Invalid face indices on line " << line_number 
-                                    << " (indices: " << x << "," << y << "," << z 
-                                    << ", vertex count: " << vertice_data.size() << ")" << std::endl;
+                            first_slash = y.find('/');
+                            second_slash = y.find('/', first_slash + 1);
+
+                            v_idx2 = std::stoi(y.substr(0, first_slash)) - 1;
+                            t_idx2 = std::stoi(y.substr(first_slash + 1, second_slash - (first_slash + 1))) - 1;
+
+                            first_slash = z.find('/');
+                            second_slash = z.find('/', first_slash + 1);
+
+                            v_idx3 = std::stoi(z.substr(0, first_slash)) - 1; 
+                            t_idx3 = std::stoi(z.substr(first_slash + 1, second_slash - (first_slash + 1))) - 1;
                         }
-                    } else {
+                        catch(const std::invalid_argument& e){
+                            std::cerr << "Error: Invalid argument for stoidfsdf. ";
+                            continue;
+                        }
+                        
+                        if(iss>>w){
+                            size_t first_slash = w.find('/');
+                            size_t second_slash = w.find('/', first_slash + 1);
+                            int v_idx4;
+                            int t_idx4;
+                            try{
+                                v_idx4 = std::stoi(w.substr(0, first_slash)) - 1; // OBJ indices are 1-based
+                                t_idx4 = std::stoi(w.substr(first_slash + 1, second_slash - (first_slash + 1))) - 1;
+                            }
+                            catch(const std::invalid_argument& e){
+                                std::cerr << "Error: Invalid argument for stoi. ";
+                                continue;
+                            }
+
+                            // Bounds checking
+                            if (v_idx1 >= 0 && v_idx1 < vertice_data.size() && t_idx1 < texture_data.size() && t_idx1 >= 0 &&
+                                v_idx2 >= 0 && v_idx2 < vertice_data.size() && t_idx2 < texture_data.size() && t_idx2 >= 0 &&
+                                v_idx3 >= 0 && v_idx3 < vertice_data.size() && t_idx3 < texture_data.size() && t_idx3 >= 0 &&
+                                v_idx4 >= 0 && v_idx4 < vertice_data.size() && t_idx4 < texture_data.size() && t_idx4 >= 0 
+                            ) {
+                                triangle tri1 = {vertice_data[v_idx1], vertice_data[v_idx2], vertice_data[v_idx3],texture_data[t_idx1], texture_data[t_idx2], texture_data[t_idx3] };
+                                triangle tri2 = {vertice_data[v_idx1], vertice_data[v_idx3], vertice_data[v_idx4], texture_data[t_idx1], texture_data[t_idx3], texture_data[t_idx4]};
+                                triangle_data.push_back(tri1);
+                                triangle_data.push_back(tri2);
+                            }
+                        }
+                        else{                    
+                            // Bounds checking
+                            if (v_idx1 >= 0 && v_idx1 < vertice_data.size() && t_idx1 < texture_data.size() && t_idx1 >= 0 &&
+                                v_idx2 >= 0 && v_idx2 < vertice_data.size() && t_idx2 < texture_data.size() && t_idx2 >= 0 &&
+                                v_idx3 >= 0 && v_idx3 < vertice_data.size() && t_idx3 < texture_data.size() && t_idx3 >= 0
+                            ) {
+                                triangle tri1 = {vertice_data[v_idx1], vertice_data[v_idx2], vertice_data[v_idx3],texture_data[t_idx1], texture_data[t_idx2], texture_data[t_idx3] };
+                                triangle_data.push_back(tri1);
+                            } 
+                        }
+
+                    }
+                    else {
                         std::cerr << "Warning: Invalid face on line " << line_number << std::endl;
                     }
                 }
@@ -352,10 +498,6 @@ bool EngineBackend::ConstructConsole(){
             return triangle_data;
         }
 
-        void EngineBackend::Camera_Rotation(){
-            //shld i find all the points in 3d space
-            
-        }
 
         mat4x4 EngineBackend::pointAt(vec3D pos, vec3D target, vec3D up) {
             vec3D f = Vector_Sub(target, pos);
@@ -394,10 +536,19 @@ bool EngineBackend::ConstructConsole(){
         {
             return { v1.x * k, v1.y * k, v1.z * k };
         }
+        vec2D EngineBackend::Vector_2D_Mul(vec2D &v1, float k)
+        {
+            return { v1.u * k, v1.v * k, v1.z * k };
+        }
 
         vec3D EngineBackend::Vector_Sub(vec3D& v1, vec3D& v2)
         {
             return {v1.x-v2.x, v1.y-v2.y, v1.z-v2.z};
+        }
+
+        vec2D EngineBackend::Vector_2D_Sub(vec2D& v1, vec2D& v2)
+        {
+            return {v1.u-v2.u, v1.v-v2.v, v1.z-v2.z};
         }
 
         vec3D EngineBackend::Vector_Div(vec3D &v1, float k)
@@ -432,6 +583,13 @@ bool EngineBackend::ConstructConsole(){
         {
             return { v1.x + v2.x, v1.y + v2.y, v1.z + v2.z };
         }
+
+        vec2D EngineBackend::Vector_2D_Add(vec2D &v1, vec2D &v2)
+        {
+            return { v1.u + v2.u, v1.v + v2.v, v1.z + v2.z };
+        }
+
+
 
         mat4x4 EngineBackend::Matrix_MakeIdentity()
         {
@@ -730,7 +888,7 @@ bool EngineBackend::ConstructConsole(){
 	    }
 
 
-        vec3D EngineBackend::Vector_IntersectPlane(vec3D &plane_p, vec3D &plane_n, vec3D &lineStart, vec3D &lineEnd)
+        std::tuple<vec3D, float> EngineBackend::Vector_IntersectPlane(vec3D &plane_p, vec3D &plane_n, vec3D &lineStart, vec3D &lineEnd)
         {
             plane_n = Vector_Normalise(plane_n);
             float plane_d = -dot(plane_n, plane_p);
@@ -739,7 +897,7 @@ bool EngineBackend::ConstructConsole(){
             float t = (-plane_d - ad) / (bd - ad);
             vec3D lineStartToEnd = Vector_Sub(lineEnd, lineStart);
             vec3D lineToIntersect = Vector_Mul(lineStartToEnd, t);
-            return Vector_Add(lineStart, lineToIntersect);
+            return std::make_tuple(Vector_Add(lineStart, lineToIntersect),t);
         }
 
         int EngineBackend::Triangle_ClipAgainstPlane(vec3D plane_p, vec3D plane_n, triangle &in_tri, triangle &out_tri1, triangle &out_tri2)
@@ -756,37 +914,40 @@ bool EngineBackend::ConstructConsole(){
 
             // Create two temporary storage arrays to classify points either side of plane
             // If distance sign is positive, point lies on "inside" of plane
-            vec3D* inside_points[3];  int nInsidePointCount = 0;
-            vec3D* outside_points[3]; int nOutsidePointCount = 0;
+            vec3D* inside_points[3];  int nInsidePointCount = 0; int nInsideTextureCount = 0;
+            vec3D* outside_points[3]; int nOutsidePointCount = 0; int nOutsideTextureCount = 0;
 
+            vec2D* inside_texture[3]; 
+            vec2D* outside_texture[3]; 
             // Get signed distance of each point in triangle to plane
             float d0 = dist(in_tri.vertices[0]);
             float d1 = dist(in_tri.vertices[1]);
             float d2 = dist(in_tri.vertices[2]);
 
-            if (d0 >= 0) { inside_points[nInsidePointCount++] = &in_tri.vertices[0]; }
-            else { outside_points[nOutsidePointCount++] = &in_tri.vertices[0]; }
-            if (d1 >= 0) { inside_points[nInsidePointCount++] = &in_tri.vertices[1]; }
-            else { outside_points[nOutsidePointCount++] = &in_tri.vertices[1]; }
-            if (d2 >= 0) { inside_points[nInsidePointCount++] = &in_tri.vertices[2]; }
-            else { outside_points[nOutsidePointCount++] = &in_tri.vertices[2]; }
+            if (d0 >= 0) { inside_points[nInsidePointCount++] = &in_tri.vertices[0]; 
+            inside_texture[nInsideTextureCount++] = &in_tri.t[0];}
+            else { outside_points[nOutsidePointCount++] = &in_tri.vertices[0]; 
+            outside_texture[nOutsideTextureCount++] = &in_tri.t[0]; }
+            if (d1 >= 0) { inside_points[nInsidePointCount++] = &in_tri.vertices[1]; 
+            inside_texture[nInsideTextureCount++] = &in_tri.t[1];}
+            else { outside_points[nOutsidePointCount++] = &in_tri.vertices[1]; 
+            outside_texture[nOutsideTextureCount++] = &in_tri.t[1];}
+            if (d2 >= 0) { inside_points[nInsidePointCount++] = &in_tri.vertices[2]; 
+            inside_texture[nInsideTextureCount++] = &in_tri.t[2];}
+            else { outside_points[nOutsidePointCount++] = &in_tri.vertices[2]; 
+            outside_texture[nOutsideTextureCount++] = &in_tri.t[2];}
 
-            // Now classify triangle points, and break the input triangle into 
-            // smaller output triangles if required. There are four possible
-            // outcomes...
 
             if (nInsidePointCount == 0)
             {
-                // All points lie on the outside of plane, so clip whole triangle
-                // It ceases to exist
+
 
                 return 0; // No returned triangles are valid
             }
 
             if (nInsidePointCount == 3)
             {
-                // All points lie on the inside of plane, so do nothing
-                // and allow the triangle to simply pass through
+
                 out_tri1 = in_tri;
 
                 return 1; // Just the one returned original triangle is valid
@@ -794,42 +955,109 @@ bool EngineBackend::ConstructConsole(){
 
             if (nInsidePointCount == 1 && nOutsidePointCount == 2)
             {
-                // Triangle should be clipped. As two points lie outside
-                // the plane, the triangle simply becomes a smaller triangle
 
-                
-                // The inside point is valid, so keep that...
                 out_tri1.vertices[0] = *inside_points[0];
+                out_tri1.t[0] = *inside_texture[0];
 
-                // but the two new points are at the locations where the 
-                // original sides of the triangle (lines) intersect with the plane
-                out_tri1.vertices[1] = Vector_IntersectPlane(plane_p, plane_n, *inside_points[0], *outside_points[0]);
-                out_tri1.vertices[2] = Vector_IntersectPlane(plane_p, plane_n, *inside_points[0], *outside_points[1]);
+
+                float t;
+                std::tie(out_tri1.vertices[1], t) = Vector_IntersectPlane(plane_p, plane_n, *inside_points[0], *outside_points[0]);
+                vec2D lineInsideToOutside = Vector_2D_Sub(*outside_texture[0], *inside_texture[0]);
+                vec2D lineToIntersect = Vector_2D_Mul(lineInsideToOutside, t);
+                out_tri1.t[1] = Vector_2D_Add(*inside_texture[0],lineToIntersect);
+
+                std::tie(out_tri1.vertices[2], t) = Vector_IntersectPlane(plane_p, plane_n, *inside_points[0], *outside_points[1]);
+                lineInsideToOutside = Vector_2D_Sub(*outside_texture[1], *inside_texture[0]);
+                lineToIntersect = Vector_2D_Mul(lineInsideToOutside, t);
+                out_tri1.t[2] = Vector_2D_Add(*inside_texture[0],lineToIntersect);
+
 
                 return 1; // Return the newly formed single triangle
             }
 
             if (nInsidePointCount == 2 && nOutsidePointCount == 1)
             {
-                // Triangle should be clipped. As two points lie inside the plane,
-                // the clipped triangle becomes a "quad". Fortunately, we can
-                // represent a quad with two new triangles
 
-
-                // The first triangle consists of the two inside points and a new
-                // point determined by the location where one side of the triangle
-                // intersects with the plane
                 out_tri1.vertices[0] = *inside_points[0];
                 out_tri1.vertices[1] = *inside_points[1];
-                out_tri1.vertices[2] = Vector_IntersectPlane(plane_p, plane_n, *inside_points[0], *outside_points[0]);
+
+                out_tri1.t[0] = *inside_texture[0]; 
+                out_tri1.t[1] = *inside_texture[1];
+
+                float t;
+                std::tie(out_tri1.vertices[2], t) = Vector_IntersectPlane(plane_p, plane_n, *inside_points[0], *outside_points[0]);
+                vec2D lineInsideToOutside = Vector_2D_Sub(*outside_texture[0], *inside_texture[0]);
+                vec2D lineToIntersect = Vector_2D_Mul(lineInsideToOutside, t);
+                out_tri1.t[2] = Vector_2D_Add(*inside_texture[0],lineToIntersect);
 
                 // The second triangle is composed of one of he inside points, a
                 // new point determined by the intersection of the other side of the 
                 // triangle and the plane, and the newly created point above
                 out_tri2.vertices[0] = *inside_points[1];
                 out_tri2.vertices[1] = out_tri1.vertices[2];
-                out_tri2.vertices[2] = Vector_IntersectPlane(plane_p, plane_n, *inside_points[1], *outside_points[0]);
+                std::tie(out_tri2.vertices[2], t) = Vector_IntersectPlane(plane_p, plane_n, *inside_points[1], *outside_points[0]);
+                lineInsideToOutside = Vector_2D_Sub(*outside_texture[0], *inside_texture[1]);
+                lineToIntersect = Vector_2D_Mul(lineInsideToOutside, t);
+                out_tri2.t[2] = Vector_2D_Add(*inside_texture[1],lineToIntersect);
 
                 return 2; // Return two newly formed triangles which form a quad
             }
         }
+
+        int EngineBackend::Sample_PNG(float u , float v){
+
+            if (image.empty()) {
+                return 1;
+            }
+
+            u = std::max(0.0f, std::min(1.0f, u));
+            v = std::max(0.0f, std::min(1.0f, v));
+            int col = std::min((int)(u * image.cols), image.cols - 1);  // u -> column (x)
+            int row = std::min((int)(v * image.rows), image.rows - 1);  // v -> row (y)
+
+            try{
+                // std::cerr << row<<" "<<col << std::endl;
+                cv::Vec3b pixel = image.at<cv::Vec3b>(row,col); // Access pixel at row y, column x
+                int b = (int)pixel[0];
+                int g = (int)pixel[1];
+                int r = (int)pixel[2];
+
+                int qr = QuantizeChannel(r, 16);
+                int qg = QuantizeChannel(g, 16); 
+                int qb = QuantizeChannel(b, 16);
+                uint32_t rgb_key = (qr << 12) | (qg << 6) | qb; // Smaller key space
+                int actual_r = (qr * 255) / 15;
+                int actual_g = (qg * 255) / 15;
+                int actual_b = (qb * 255) / 15;
+
+                auto it = color_cache.find(rgb_key);
+                if (it != color_cache.end()) {
+                    return it->second;
+                }
+                
+                // Create new color pair if we haven't hit the limit
+                if (next_color_id < COLOR_PAIRS) {
+                     int ncurses_r = (actual_r * 1000) / 255;
+                    int ncurses_g = (actual_g * 1000) / 255;
+                    int ncurses_b = (actual_b * 1000) / 255;
+                    
+                    init_color(next_color_id, ncurses_r,ncurses_g, ncurses_b);
+                    init_pair(next_color_id, next_color_id, COLOR_BLACK);
+                    
+                    color_cache[rgb_key] = next_color_id;
+                    return next_color_id++;
+                }   
+            }
+            catch(const std::exception& e){
+                std::cerr<<"invalid";
+            }
+            
+
+            //return pair 1 for now if the limit is reached
+            return 1;
+        }
+
+        int EngineBackend::QuantizeChannel(int value, int levels) {
+            return (value * (levels - 1)) / 255;
+        }
+

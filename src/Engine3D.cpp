@@ -8,80 +8,44 @@ class Engine3D: public EngineBackend{
         Engine3D(){};
         bool OnUserCreate() override{
 
-            mesh.tris = Read_File("../mountains.obj");
+            mesh.tris = Read_File("../cottage_obj.obj");
+
             // mesh.tris = {
-
-            // // SOUTH
-            // { 0.0f, 0.0f, 0.0f,    0.0f, 1.0f, 0.0f,    1.0f, 1.0f, 0.0f },
-            // { 0.0f, 0.0f, 0.0f,    1.0f, 1.0f, 0.0f,    1.0f, 0.0f, 0.0f },
-
-            // // EAST                                                      
-            // { 1.0f, 0.0f, 0.0f,    1.0f, 1.0f, 0.0f,    1.0f, 1.0f, 1.0f },
-            // { 1.0f, 0.0f, 0.0f,    1.0f, 1.0f, 1.0f,    1.0f, 0.0f, 1.0f },
-
-            // // NORTH                                                     
-            // { 1.0f, 0.0f, 1.0f,    1.0f, 1.0f, 1.0f,    0.0f, 1.0f, 1.0f },
-            // { 1.0f, 0.0f, 1.0f,    0.0f, 1.0f, 1.0f,    0.0f, 0.0f, 1.0f },
-
-            // // WEST                                                      
-            // { 0.0f, 0.0f, 1.0f,    0.0f, 1.0f, 1.0f,    0.0f, 1.0f, 0.0f },
-            // { 0.0f, 0.0f, 1.0f,    0.0f, 1.0f, 0.0f,    0.0f, 0.0f, 0.0f },
-
-            // // TOP                                                       
-            // { 0.0f, 1.0f, 0.0f,    0.0f, 1.0f, 1.0f,    1.0f, 1.0f, 1.0f },
-            // { 0.0f, 1.0f, 0.0f,    1.0f, 1.0f, 1.0f,    1.0f, 1.0f, 0.0f },
-
-            // // BOTTOM                                                    
-            // { 1.0f, 0.0f, 1.0f,    0.0f, 0.0f, 1.0f,    0.0f, 0.0f, 0.0f },
-            // { 1.0f, 0.0f, 1.0f,    0.0f, 0.0f, 0.0f,    1.0f, 0.0f, 0.0f },
-
+            //     // SOUTH
+            //     { 0.0f, 0.0f, 0.0f, 1.0f,    0.0f, 1.0f, 0.0f, 1.0f,    1.0f, 1.0f, 0.0f, 1.0f,		0.0f, 1.0f, 1.0f,		0.0f, 0.0f, 1.0f,		1.0f, 0.0f, 1.0f,}, 
+            //     { 0.0f, 0.0f, 0.0f, 1.0f,    1.0f, 1.0f, 0.0f, 1.0f,    1.0f, 0.0f, 0.0f, 1.0f,		0.0f, 1.0f, 1.0f,		1.0f, 0.0f, 1.0f,		1.0f, 1.0f, 1.0f,},
+                                                                                                            
+            //     // EAST           																			   
+            //     { 1.0f, 0.0f, 0.0f, 1.0f,    1.0f, 1.0f, 0.0f, 1.0f,    1.0f, 1.0f, 1.0f, 1.0f,		0.0f, 1.0f, 1.0f,		0.0f, 0.0f, 1.0f,		1.0f, 0.0f, 1.0f,},
+            //     { 1.0f, 0.0f, 0.0f, 1.0f,    1.0f, 1.0f, 1.0f, 1.0f,    1.0f, 0.0f, 1.0f, 1.0f,		0.0f, 1.0f, 1.0f,		1.0f, 0.0f, 1.0f,		1.0f, 1.0f, 1.0f,},
+                                                                                                            
+            //     // NORTH           																			   
+            //     { 1.0f, 0.0f, 1.0f, 1.0f,    1.0f, 1.0f, 1.0f, 1.0f,    0.0f, 1.0f, 1.0f, 1.0f,		0.0f, 1.0f, 1.0f,		0.0f, 0.0f, 1.0f,		1.0f, 0.0f, 1.0f,},
+            //     { 1.0f, 0.0f, 1.0f, 1.0f,    0.0f, 1.0f, 1.0f, 1.0f,    0.0f, 0.0f, 1.0f, 1.0f,		0.0f, 1.0f, 1.0f,		1.0f, 0.0f, 1.0f,		1.0f, 1.0f, 1.0f,},
+                                                                                                            
+            //     // WEST            																			   
+            //     { 0.0f, 0.0f, 1.0f, 1.0f,    0.0f, 1.0f, 1.0f, 1.0f,    0.0f, 1.0f, 0.0f, 1.0f,		0.0f, 1.0f, 1.0f,		0.0f, 0.0f, 1.0f,		1.0f, 0.0f, 1.0f,},
+            //     { 0.0f, 0.0f, 1.0f, 1.0f,    0.0f, 1.0f, 0.0f, 1.0f,    0.0f, 0.0f, 0.0f, 1.0f,		0.0f, 1.0f, 1.0f,		1.0f, 0.0f, 1.0f,		1.0f, 1.0f, 1.0f,},
+                                                                                                            
+            //     // TOP             																			   
+            //     { 0.0f, 1.0f, 0.0f, 1.0f,    0.0f, 1.0f, 1.0f, 1.0f,    1.0f, 1.0f, 1.0f, 1.0f,		0.0f, 1.0f, 1.0f,		0.0f, 0.0f, 1.0f,		1.0f, 0.0f, 1.0f,},
+            //     { 0.0f, 1.0f, 0.0f, 1.0f,    1.0f, 1.0f, 1.0f, 1.0f,    1.0f, 1.0f, 0.0f, 1.0f,		0.0f, 1.0f, 1.0f,		1.0f, 0.0f, 1.0f,		1.0f, 1.0f, 1.0f,},
+                                                                                                            
+            //     // BOTTOM          																			  
+            //     { 1.0f, 0.0f, 1.0f, 1.0f,    0.0f, 0.0f, 1.0f, 1.0f,    0.0f, 0.0f, 0.0f, 1.0f,		0.0f, 1.0f, 1.0f,		0.0f, 0.0f, 1.0f,		1.0f, 0.0f, 1.0f,},
+            //     { 1.0f, 0.0f, 1.0f, 1.0f,    0.0f, 0.0f, 0.0f, 1.0f,    1.0f, 0.0f, 0.0f, 1.0f,		0.0f, 1.0f, 1.0f,		1.0f, 0.0f, 1.0f,		1.0f, 1.0f, 1.0f,},
             // };
+
 
             return true;
         };
         bool OnUserUpdate(float fElapsedTime) override{ 
-            // Set up rotation matrices
 
-            // mat4x4 matRotZ, matRotX;
-            // fTheta = 0.0f;
-
-            // matRotZ = Matrix_MakeRotationZ(fTheta * 0.5f);
-            // matRotX = Matrix_MakeRotationX(fTheta);
-            // mat4x4 matTrans;
-            // matTrans = Matrix_MakeTranslation(0.0f, 0.0f, 5.0f);
-
-
-            // // Rotation Z
-            // matRotZ.m[0][0] = cosf(fTheta);
-            // matRotZ.m[0][1] = sinf(fTheta);
-            // matRotZ.m[1][0] = -sinf(fTheta);
-            // matRotZ.m[1][1] = cosf(fTheta);
-            // matRotZ.m[2][2] = 1;
-            // matRotZ.m[3][3] = 1;
-
-            // // Rotation X
-            // matRotX.m[0][0] = 1;
-            // matRotX.m[1][1] = cosf(fTheta * 0.5f);      
-            // matRotX.m[1][2] = sinf(fTheta * 0.5f);
-            // matRotX.m[2][1] = -sinf(fTheta * 0.5f);
-            // matRotX.m[2][2] = cosf(fTheta * 0.5f);
-            // matRotX.m[3][3] = 1;
-
-
-            // mat4x4 matWorld;
-            // matWorld = Matrix_MakeIdentity();	// Form World Matrix
-            // matWorld = Matrix_MultiplyMatrix(matRotZ, matRotX); // Transform by rotation
-            // matWorld = Matrix_MultiplyMatrix(matWorld, matTrans); // Transform by translation
-
-            // vec3D vtarget = Vector_Add(vlookDir,camera);
-            // mat4x4 point_at = pointAt(camera, vtarget, vup);
-            // mat4x4 look_at  = Matrix_QuickInverse(point_at);
-           
 
             Clear_Buffers();
             global_tqueue.clear();
             mat4x4 matRotZ, matRotX;
-            //fTheta += 1.0f * fElapsedTime; // Uncomment to spin around
+            // fTheta += 1.0f * fElapsedTime; // Uncomment to spin around
             matRotZ = Matrix_MakeRotationZ(fTheta * 0.5f);
             matRotX = Matrix_MakeRotationX(fTheta);
 
@@ -98,48 +62,42 @@ class Engine3D: public EngineBackend{
             mat4x4 matCameraRotP = Matrix_MakeRotationX(fPitch);
             vlookDir = Matrix_MultiplyVector(matCameraRotP, vTarget);
 
-            // Then apply yaw (around world Y-axis)
             mat4x4 matCameraRotY = Matrix_MakeRotationY(fYaw);
             vlookDir = Matrix_MultiplyVector(matCameraRotY, vlookDir);
 
 
-
             vTarget = Vector_Add(camera, vlookDir);
             mat4x4 matCamera = pointAt(camera, vTarget, vup);
-
-
             // Make view matrix from camera
             mat4x4 matView = Matrix_QuickInverse(matCamera);
-            // Generate_Planes(matView);
 
-            // Store triagles for rastering later
-            vector<triangle> vecTrianglesToRaster;
             for (auto tri : mesh.tris)
             {
                 triangle  triViewed, triWorldSpace;
 
-
-                
-
-                // // Step 1: Transform to world space
                 MultiplyMatrixVector(tri.vertices[0], triWorldSpace.vertices[0], matWorld);
                 MultiplyMatrixVector(tri.vertices[1], triWorldSpace.vertices[1], matWorld);
                 MultiplyMatrixVector(tri.vertices[2], triWorldSpace.vertices[2], matWorld);
+                triWorldSpace.t[0] = tri.t[0];
+                triWorldSpace.t[1] = tri.t[1];
+                triWorldSpace.t[2] = tri.t[2];
 
-                // Step 2: Transform to view space
+
                 MultiplyMatrixVector(triWorldSpace.vertices[0], triViewed.vertices[0], matView);
                 MultiplyMatrixVector(triWorldSpace.vertices[1], triViewed.vertices[1], matView);
                 MultiplyMatrixVector(triWorldSpace.vertices[2], triViewed.vertices[2], matView);
+                triViewed.t[0] = triWorldSpace.t[0];
+                triViewed.t[1] = triWorldSpace.t[1]; 
+                triViewed.t[2] = triWorldSpace.t[2]; 
 
-               
 
+                
                 triangle clipped[2];
                 int clipped_tris = Triangle_ClipAgainstPlane({ 0.0f, 0.0f, 0.01f }, { 0.0f, 0.0f, 1.0f }, triViewed, clipped[0], clipped[1]);
                 for (int n = 0; n < clipped_tris; n++)
 				{
-                    triangle triProjected;
+                    triangle triTranslated,triProjected;
                     triTranslated = clipped[n];
-      
                     vec3D line1, line2;
                     line1.x = triTranslated.vertices[0].x - triTranslated.vertices[1].x;
                     line1.y = triTranslated.vertices[0].y - triTranslated.vertices[1].y;
@@ -162,6 +120,7 @@ class Engine3D: public EngineBackend{
                         normal.z /= magnitude;
                     }
 
+                    // check if this works for backface culling
                     if(((normal.x*(triTranslated.vertices[0].x-vlookDir.x)) + (normal.y*(triTranslated.vertices[0].y - vlookDir.y))
                         + (normal.z*(triTranslated.vertices[0].z- vlookDir.z)))>0.0f){
                             continue;
@@ -172,6 +131,10 @@ class Engine3D: public EngineBackend{
                     MultiplyMatrixVector(triTranslated.vertices[0], triProjected.vertices[0], proj);
                     MultiplyMatrixVector(triTranslated.vertices[1], triProjected.vertices[1], proj);
                     MultiplyMatrixVector(triTranslated.vertices[2], triProjected.vertices[2], proj);
+                    triProjected.t[0] = triTranslated.t[0];
+                    triProjected.t[1] = triTranslated.t[1];
+                    triProjected.t[2] = triTranslated.t[2];
+
 
                     triProjected.vertices[0] = Vector_Div(triProjected.vertices[0], triProjected.vertices[0].w);
                     triProjected.vertices[1] = Vector_Div(triProjected.vertices[1], triProjected.vertices[1].w);
@@ -262,10 +225,10 @@ class Engine3D: public EngineBackend{
 
                 //yaw
                 if ((char)ch == 't') {
-                    fYaw += 100.0f* fElapsedTime;
+                    fYaw += 200.0f* fElapsedTime;
                 }
                 if ((char)ch == 'g') {
-                    fYaw -= 100.0f* fElapsedTime;
+                    fYaw -= 200.0f* fElapsedTime;
                 }
 
                 //move up
@@ -307,8 +270,6 @@ class Engine3D: public EngineBackend{
         vec3D camera = {0.0f,0.0f, 0.0f} ;
         float fYaw = 0;
         float fPitch = 0;
-        triangle triTranslated;
-
 
 };
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <opencv2/opencv.hpp>
 
 #include <ncurses.h>
 #include <iostream>
@@ -21,6 +22,7 @@
 #include <vector>    // To store data dynamically
 #include <sstream>   // For parsing lines (istringstream)
 #include <deque>
+#include <tuple>
 
 struct vec3D{
     float x=0;
@@ -29,8 +31,15 @@ struct vec3D{
     float w=1;
 };
 
+struct vec2D{
+    float u=0;
+    float v=0;
+    float z=0;
+};
+
 struct triangle{
     vec3D vertices[3];
+    vec2D t[3];
 };
 
 struct Mesh{
@@ -56,7 +65,7 @@ class EngineBackend{
 
         void Close();
         void Start();
-
+int QuantizeChannel(int value, int levels);
         bool virtual OnUserUpdate(float fElapsedTime);
 
         bool virtual OnUserCreate();
@@ -78,15 +87,17 @@ class EngineBackend{
 
         void RasterizeTriangle_EdgeFunction(vec3D normal, vec3D illum, triangle a, triangle triTranslated);
 
+        void Scanline_Rasterize(vec3D normal, vec3D illum, triangle a,triangle t);
+
         void Clear_Buffers();
 
         vec3D BaryCentricCoords(vec3D p, vec3D a, vec3D b, vec3D c);
+        vec2D BaryCentricCoords_2D(vec2D p, vec2D a, vec2D b, vec2D c);
 
         std::vector<triangle> Read_File(std::string file_path);
 
         void Render();
 
-        void Camera_Rotation();
 
         vec3D normalize(vec3D& vector );
 
@@ -102,6 +113,10 @@ class EngineBackend{
         vec3D Vector_Normalise(vec3D &v);
         float Vector_Length(vec3D &v);
         vec3D Vector_Div(vec3D &v1, float k);
+        vec2D Vector_2D_Add(vec2D &v1, vec2D &v2);
+        vec2D Vector_2D_Sub(vec2D& v1, vec2D& v2);
+        vec2D Vector_2D_Mul(vec2D &v1, float k);
+        
 
         mat4x4 Matrix_MakeIdentity();
 
@@ -119,8 +134,9 @@ class EngineBackend{
         void Clipping(triangle tri);
         void Generate_Planes(mat4x4 matCamera);
         // vec3D Vector_Intersect_Plane(vec3D plane, vec3D vector, vec3D point);        
-        vec3D Vector_IntersectPlane(vec3D &plane_p, vec3D &plane_n, vec3D &lineStart, vec3D &lineEnd);
+        std::tuple<vec3D, float> Vector_IntersectPlane(vec3D &plane_p, vec3D &plane_n, vec3D &lineStart, vec3D &lineEnd);
         int Triangle_ClipAgainstPlane(vec3D plane_p, vec3D plane_n, triangle &in_tri, triangle &out_tri1, triangle &out_tri2);
+        int Sample_PNG(float u , float v);
         
     protected:
         int screen_width;
@@ -142,6 +158,9 @@ class EngineBackend{
         vec3D bottom_plane;
         vec3D near_plane;
         vec3D far_plane;
-        
+        int count = 16;
+        cv::Mat image;
+        std::unordered_map<uint32_t, int> color_cache; // RGB -> color_pair_id
+        int next_color_id = 10;
 
 };

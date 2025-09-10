@@ -31,10 +31,14 @@ pkg_check_modules(NCURSES REQUIRED ncurses)
 # Find threading library
 find_package(Threads REQUIRED)
 
+# Find OpenCV
+find_package(OpenCV REQUIRED)
+
 
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
 include_directories(${NCURSES_INCLUDE_DIRS})
+include_directories(${OpenCV_INCLUDE_DIRS})
 
 
 add_library(Engine3D STATIC
@@ -45,11 +49,13 @@ add_library(Engine3D STATIC
 target_include_directories(Engine3D PUBLIC
     ${CMAKE_SOURCE_DIR}/include
     ${NCURSES_INCLUDE_DIRS}
+    ${OpenCV_INCLUDE_DIRS}
 )
 
 # Remove the .hpp from target_link_libraries
 target_link_libraries(Engine3D PUBLIC
     ${NCURSES_LIBRARIES}
+    ${OpenCV_LIBS}
     Threads::Threads
 )
 
