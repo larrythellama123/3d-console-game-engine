@@ -281,12 +281,8 @@ bool EngineBackend::ConstructConsole(){
             point1.y += 1;
 
             point2.x += dAC;
-            
-    
+
         }
-
-
-
 
 
 
@@ -385,118 +381,223 @@ bool EngineBackend::ConstructConsole(){
 
 
         std::vector<triangle> EngineBackend::Read_File(std::string file_path){
-            std::ifstream file(file_path); // Replace with your file path
+
+            std::ifstream file(file_path);
+
             std::vector<vec3D> vertice_data;
-            std::vector<vec2D> texture_data;
+
             std::vector<triangle> triangle_data;
 
+
+
             triangle_data.reserve(300000); // Adjust based on expected size
-            
+
+
+
             vertice_data.reserve(500000); // Pre-allocate reasonable size
-                
+
+
+
             int line_number = 0;
+
             if (!file.is_open()) {
+
                 std::cerr << "Error: Could not open file!" << std::endl;
+
             }
+
             std::string line;
+
             while (std::getline(file, line)) {
+
                 line_number++;
-                // std::cout<<line_number << " ";
+
+
                 std::istringstream iss(line);
+
                 std::string prefix;
+
                 iss >> prefix;
-                if(prefix == "vt"){
-                    float u, v;
-                    iss >> u >> v;
-                    vec2D vector = {u,v,0};
-                    texture_data.push_back(vector);
-                }
+
                 if(prefix == "v"){
+
                     float x, y, z;
+
                     iss >> x >> y >> z;  
+
                     vec3D vector = {x,y,z};
+
                     vertice_data.push_back(vector);
+
                 }
 
                 if(prefix == "f"){
-                    std::string x, y, z, w;
-                    //check if quad or tri 
+
+                    int x, y, z;
                     if (iss >> x >> y >> z) {
-                        size_t first_slash = x.find('/');
-                        size_t second_slash = x.find('/', first_slash + 1);
-                        int v_idx1;
-                        int v_idx2;
-                        int v_idx3;
-                        int t_idx1;
-                        int t_idx2;
-                        int t_idx3;
 
-                        try{
-                            v_idx1 = std::stoi(x.substr(0, first_slash)) - 1;    
-                            t_idx1 = std::stoi(x.substr(first_slash + 1, second_slash - (first_slash + 1))) - 1;
+                        // Convert to 0-based indexing and check bounds
 
-                            first_slash = y.find('/');
-                            second_slash = y.find('/', first_slash + 1);
+                        int idx1 = x - 1;
 
-                            v_idx2 = std::stoi(y.substr(0, first_slash)) - 1;
-                            t_idx2 = std::stoi(y.substr(first_slash + 1, second_slash - (first_slash + 1))) - 1;
+                        int idx2 = y - 1; 
 
-                            first_slash = z.find('/');
-                            second_slash = z.find('/', first_slash + 1);
+                        int idx3 = z - 1;
 
-                            v_idx3 = std::stoi(z.substr(0, first_slash)) - 1; 
-                            t_idx3 = std::stoi(z.substr(first_slash + 1, second_slash - (first_slash + 1))) - 1;
-                        }
-                        catch(const std::invalid_argument& e){
-                            std::cerr << "Error: Invalid argument for stoidfsdf. ";
-                            continue;
-                        }
-                        
-                        if(iss>>w){
-                            size_t first_slash = w.find('/');
-                            size_t second_slash = w.find('/', first_slash + 1);
-                            int v_idx4;
-                            int t_idx4;
-                            try{
-                                v_idx4 = std::stoi(w.substr(0, first_slash)) - 1; // OBJ indices are 1-based
-                                t_idx4 = std::stoi(w.substr(first_slash + 1, second_slash - (first_slash + 1))) - 1;
-                            }
-                            catch(const std::invalid_argument& e){
-                                std::cerr << "Error: Invalid argument for stoi. ";
-                                continue;
-                            }
 
-                            // Bounds checking
-                            if (v_idx1 >= 0 && v_idx1 < vertice_data.size() && t_idx1 < texture_data.size() && t_idx1 >= 0 &&
-                                v_idx2 >= 0 && v_idx2 < vertice_data.size() && t_idx2 < texture_data.size() && t_idx2 >= 0 &&
-                                v_idx3 >= 0 && v_idx3 < vertice_data.size() && t_idx3 < texture_data.size() && t_idx3 >= 0 &&
-                                v_idx4 >= 0 && v_idx4 < vertice_data.size() && t_idx4 < texture_data.size() && t_idx4 >= 0 
-                            ) {
-                                triangle tri1 = {vertice_data[v_idx1], vertice_data[v_idx2], vertice_data[v_idx3],texture_data[t_idx1], texture_data[t_idx2], texture_data[t_idx3] };
-                                triangle tri2 = {vertice_data[v_idx1], vertice_data[v_idx3], vertice_data[v_idx4], texture_data[t_idx1], texture_data[t_idx3], texture_data[t_idx4]};
-                                triangle_data.push_back(tri1);
-                                triangle_data.push_back(tri2);
-                            }
-                        }
-                        else{                    
-                            // Bounds checking
-                            if (v_idx1 >= 0 && v_idx1 < vertice_data.size() && t_idx1 < texture_data.size() && t_idx1 >= 0 &&
-                                v_idx2 >= 0 && v_idx2 < vertice_data.size() && t_idx2 < texture_data.size() && t_idx2 >= 0 &&
-                                v_idx3 >= 0 && v_idx3 < vertice_data.size() && t_idx3 < texture_data.size() && t_idx3 >= 0
-                            ) {
-                                triangle tri1 = {vertice_data[v_idx1], vertice_data[v_idx2], vertice_data[v_idx3],texture_data[t_idx1], texture_data[t_idx2], texture_data[t_idx3] };
-                                triangle_data.push_back(tri1);
-                            } 
+
+                        // Bounds checking
+
+                        if (idx1 >= 0 && idx1 < vertice_data.size() &&
+
+                            idx2 >= 0 && idx2 < vertice_data.size() &&
+
+                            idx3 >= 0 && idx3 < vertice_data.size()) {
+
+
+
+                            triangle tri = {vertice_data[idx1], vertice_data[idx2], vertice_data[idx3]};
+                            std::cout<<"bdvfd ";
+                            
+                            triangle_data.push_back(tri);
+
+                        } else {
+
+                            std::cerr << "Error: Invalid face indices on line " << line_number 
+
+                                    << " (indices: " << x << "," << y << "," << z 
+
+                                    << ", vertex count: " << vertice_data.size() << ")" << std::endl;
+
                         }
 
-                    }
-                    else {
+                    } else {
+
                         std::cerr << "Warning: Invalid face on line " << line_number << std::endl;
+
                     }
+
                 }
+
             }
+
             return triangle_data;
+
         }
+
+
+        // std::vector<triangle> EngineBackend::Read_File(std::string file_path){
+        //     std::ifstream file(file_path); 
+        //     std::vector<vec3D> vertice_data;
+        //     std::vector<vec2D> texture_data;
+        //     std::vector<triangle> triangle_data;
+
+        //     triangle_data.reserve(300000); 
+        //     vertice_data.reserve(500000);
+
+        //     int line_number = 0;
+        //     if (!file.is_open()) {
+        //         std::cerr << "Error: Could not open file!" << std::endl;
+        //     }
+        //     std::string line;
+        //     while (std::getline(file, line)) {
+        //         line_number++;
+        //         // std::cout<<line_number << " ";
+        //         std::istringstream iss(line);
+        //         std::string prefix;
+        //         iss >> prefix;
+        //         if(prefix == "vt"){
+        //             float u, v;
+        //             iss >> u >> v;
+        //             vec2D vector = {u,v,0};
+        //             texture_data.push_back(vector);
+        //         }
+        //         if(prefix == "v"){
+        //             float x, y, z;
+        //             iss >> x >> y >> z;  
+        //             vec3D vector = {x,y,z};
+        //             vertice_data.push_back(vector);
+        //         }
+
+        //         if(prefix == "f"){
+        //             std::string x, y, z, w;
+        //             //check if quad or tri 
+        //             if (iss >> x >> y >> z) {
+        //                 size_t first_slash = x.find('/');
+        //                 size_t second_slash = x.find('/', first_slash + 1);
+        //                 int v_idx1;
+        //                 int v_idx2;
+        //                 int v_idx3;
+        //                 int t_idx1;
+        //                 int t_idx2;
+        //                 int t_idx3;
+
+        //                 try{
+        //                     v_idx1 = std::stoi(x.substr(0, first_slash)) - 1;    
+        //                     t_idx1 = std::stoi(x.substr(first_slash + 1, second_slash - (first_slash + 1))) - 1;
+
+        //                     first_slash = y.find('/');
+        //                     second_slash = y.find('/', first_slash + 1);
+
+        //                     v_idx2 = std::stoi(y.substr(0, first_slash)) - 1;
+        //                     t_idx2 = std::stoi(y.substr(first_slash + 1, second_slash - (first_slash + 1))) - 1;
+
+        //                     first_slash = z.find('/');
+        //                     second_slash = z.find('/', first_slash + 1);
+
+        //                     v_idx3 = std::stoi(z.substr(0, first_slash)) - 1; 
+        //                     t_idx3 = std::stoi(z.substr(first_slash + 1, second_slash - (first_slash + 1))) - 1;
+        //                 }
+        //                 catch(const std::invalid_argument& e){
+        //                     std::cerr << "Error: Invalid argument for stoidfsdf. ";
+        //                     continue;
+        //                 }
+                        
+        //                 if(iss>>w){
+        //                     size_t first_slash = w.find('/');
+        //                     size_t second_slash = w.find('/', first_slash + 1);
+        //                     int v_idx4;
+        //                     int t_idx4;
+        //                     try{
+        //                         v_idx4 = std::stoi(w.substr(0, first_slash)) - 1; // OBJ indices are 1-based
+        //                         t_idx4 = std::stoi(w.substr(first_slash + 1, second_slash - (first_slash + 1))) - 1;
+        //                     }
+        //                     catch(const std::invalid_argument& e){
+        //                         std::cerr << "Error: Invalid argument for stoi. ";
+        //                         continue;
+        //                     }
+
+        //                     // Bounds checking
+        //                     if (v_idx1 >= 0 && v_idx1 < vertice_data.size() && t_idx1 < texture_data.size() && t_idx1 >= 0 &&
+        //                         v_idx2 >= 0 && v_idx2 < vertice_data.size() && t_idx2 < texture_data.size() && t_idx2 >= 0 &&
+        //                         v_idx3 >= 0 && v_idx3 < vertice_data.size() && t_idx3 < texture_data.size() && t_idx3 >= 0 &&
+        //                         v_idx4 >= 0 && v_idx4 < vertice_data.size() && t_idx4 < texture_data.size() && t_idx4 >= 0 
+        //                     ) {
+        //                         triangle tri1 = {vertice_data[v_idx1], vertice_data[v_idx2], vertice_data[v_idx3],texture_data[t_idx1], texture_data[t_idx2], texture_data[t_idx3] };
+        //                         triangle tri2 = {vertice_data[v_idx1], vertice_data[v_idx3], vertice_data[v_idx4], texture_data[t_idx1], texture_data[t_idx3], texture_data[t_idx4]};
+        //                         triangle_data.push_back(tri1);
+        //                         triangle_data.push_back(tri2);
+        //                     }
+        //                 }
+        //                 else{                    
+        //                     // Bounds checking
+        //                     if (v_idx1 >= 0 && v_idx1 < vertice_data.size() && t_idx1 < texture_data.size() && t_idx1 >= 0 &&
+        //                         v_idx2 >= 0 && v_idx2 < vertice_data.size() && t_idx2 < texture_data.size() && t_idx2 >= 0 &&
+        //                         v_idx3 >= 0 && v_idx3 < vertice_data.size() && t_idx3 < texture_data.size() && t_idx3 >= 0
+        //                     ) {
+        //                         triangle tri1 = {vertice_data[v_idx1], vertice_data[v_idx2], vertice_data[v_idx3],texture_data[t_idx1], texture_data[t_idx2], texture_data[t_idx3] };
+        //                         triangle_data.push_back(tri1);
+        //                     } 
+        //                 }
+
+        //             }
+        //             else {
+        //                 std::cerr << "Warning: Invalid face on line " << line_number << std::endl;
+        //             }
+        //         }
+        //     }
+        //     return triangle_data;
+        // }
 
 
         mat4x4 EngineBackend::pointAt(vec3D pos, vec3D target, vec3D up) {
@@ -1023,8 +1124,9 @@ bool EngineBackend::ConstructConsole(){
                 int r = (int)pixel[2];
 
                 int qr = QuantizeChannel(r, 16);
-                int qg = QuantizeChannel(g, 16); 
                 int qb = QuantizeChannel(b, 16);
+                int qg = QuantizeChannel(g, 16);
+
                 uint32_t rgb_key = (qr << 12) | (qg << 6) | qb; // Smaller key space
                 int actual_r = (qr * 255) / 15;
                 int actual_g = (qg * 255) / 15;
@@ -1061,3 +1163,114 @@ bool EngineBackend::ConstructConsole(){
             return (value * (levels - 1)) / 255;
         }
 
+        void EngineBackend::perlin(float x, float y){
+            //all init with 0
+            float x1 = std::ceil(x);
+            float y1 = std::ceil(y);
+            float x0 = std::floor(x);
+            float y0 = std::floor(y);
+
+            //interpolate 
+        }
+
+
+        void EngineBackend::generate_perlin(){
+
+            //4 channelss for alpha rgb; alpha to control transparency
+            // int32_t* pixels = new int32_t[screen_width * screen_height];
+            
+            const int GRID_SIZE = 400;
+            for (int x = 0; x < screen_width; x++)
+            {
+                for (int y = 0; y < screen_height; y++)
+                {
+                    int index = (y * screen_width + x) * 4;
+        
+                    
+                    float val = 0;
+        
+                    float freq = 1;
+                    float amp = 1;
+        
+                    for (int i = 0; i < 12; i++)
+                    {
+                        val += perlin(x * freq / GRID_SIZE, y * freq / GRID_SIZE) * amp;
+        
+                        freq *= 2;
+                        amp /= 2;
+        
+                    }
+        
+                    // Contrast
+                    val *= 1.2;
+
+                    //clipping
+                    if(val<-1.0){
+                        val = -1.0f;
+                    }else if(val > 1.0){
+                        val = 1.0f;
+                    }
+
+                    // //decide height first then color
+                    // int height = (int)((val + 1.0f) * 127.5f);
+                    
+                    //this will count as the height
+                    pixels[index] = val; 
+                }
+            }
+        }
+
+
+        // void EngineBackend::generate_3d_plane(){
+        //     std::ofstream outputFile("flat_plane.obj");
+        //     for(int i =0; i< 30; i++){
+        //         for(int j=0; j < 30; j++){
+        //             if (outputFile.is_open()) {
+        //                 // outputFile<<"v"<<" "<<i<<" "<<j<<" "<<pixels[i*300+j];
+        //                 outputFile<<"v"<<" "<<i<<" "<<0<<" "<<j<<std::endl;
+
+        //                 if(i-1>=0){
+        //                     if(j%2==0){
+        //                         outputFile<<"f"<<" "<<(i*30 + j)+1 <<" "<<((i-1)*30 + j)+1<<" "<<((i-1)*30 + j+1)+1<<std::endl;
+        //                     }
+        //                     else{
+        //                         outputFile<<"f"<<" "<<(i*30 + j )+1<<" "<<(i*30 + j-1)+1<<" "<<((i-1)*30 + j)+1<<std::endl;
+        //                     }
+        //                 }
+        //             } else {
+        //                 std::cerr << "Error opening file!" << std::endl;
+        //             }
+        //         }
+        //     }
+        // }
+        void EngineBackend::generate_3d_plane(){
+            std::ofstream outputFile("flat_plane.obj");
+            
+            if (!outputFile.is_open()) {
+                std::cerr << "Error opening file!" << std::endl;
+                return;
+            }
+            
+            // Generate vertices - KEEP THE SPACES!
+            for(int i = 0; i < 30; i++){
+                for(int j = 0; j < 30; j++){
+                    outputFile << "v " << i << " " << 0 << " " << j << std::endl;
+                }
+            }
+            
+            // Generate faces with correct indexing
+            for(int i = 1; i < 30; i++){  // Start from 1 since we need i-1
+                for(int j = 0; j < 29; j++){  // Go to 29 to have j+1
+                    int v1 = i * 30 + j + 1;        // Current vertex (1-based)
+                    int v2 = (i-1) * 30 + j + 1;    // Previous row, same column
+                    int v3 = (i-1) * 30 + j + 2;    // Previous row, next column
+                    int v4 = i * 30 + j + 2;        // Current row, next column
+                    
+                    // Two triangles per quad
+                    outputFile << "f " << v1 << " " << v2 << " " << v3 << std::endl;
+                    outputFile << "f " << v1 << " " << v3 << " " << v4 << std::endl;
+                }
+            }
+            
+            outputFile.close();
+        }

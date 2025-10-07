@@ -53,6 +53,17 @@
         "typeinfo": "cpp",
         "csignal": "cpp",
         "fstream": "cpp",
-        "sstream": "cpp"
+        "sstream": "cpp",
+        "cstring": "cpp",
+        "bitset": "cpp",
+        "complex": "cpp",
+        "map": "cpp",
+        "set": "cpp",
+        "optional": "cpp",
+        "iomanip": "cpp",
+        "mutex": "cpp",
+        "cinttypes": "cpp",
+        "typeindex": "cpp",
+        "variant": "cpp"
     }
 }

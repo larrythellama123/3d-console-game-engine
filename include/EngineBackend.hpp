@@ -137,6 +137,8 @@ int QuantizeChannel(int value, int levels);
         std::tuple<vec3D, float> Vector_IntersectPlane(vec3D &plane_p, vec3D &plane_n, vec3D &lineStart, vec3D &lineEnd);
         int Triangle_ClipAgainstPlane(vec3D plane_p, vec3D plane_n, triangle &in_tri, triangle &out_tri1, triangle &out_tri2);
         int Sample_PNG(float u , float v);
+        void generate_3d_plane();
+        void generate_perlin();
         
     protected:
         int screen_width;
@@ -162,5 +164,6 @@ int QuantizeChannel(int value, int levels);
         cv::Mat image;
         std::unordered_map<uint32_t, int> color_cache; // RGB -> color_pair_id
         int next_color_id = 10;
+        int32_t* pixels;
 
 };
