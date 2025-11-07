@@ -7,7 +7,7 @@ class Engine3D: public EngineBackend{
     public:
         Engine3D(){};
         bool OnUserCreate() override{
-            perlin();
+            generate_perlin();
             generate_3d_plane();
 
             mesh.tris = Read_File("../build/flat_plane.obj");
@@ -251,14 +251,10 @@ class Engine3D: public EngineBackend{
                 if ((char)ch == 'l') {
                     fPitch -= 100.0f* fElapsedTime;
                 }
-
-                
             }
-
-
-
-            // refresh();
-            // clear();
+            illumination.y = camera.y;
+            illumination.x = camera.x;
+            illumination.z = camera.z;
             return true;
         }
 

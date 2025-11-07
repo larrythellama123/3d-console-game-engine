@@ -37,6 +37,10 @@ struct vec2D{
     float z=0;
 };
 
+typedef struct {
+    float x, y;
+} vector2;
+
 struct triangle{
     vec3D vertices[3];
     vec2D t[3];
@@ -57,7 +61,10 @@ struct mat4x4{
 
 class EngineBackend{
     public:
-        EngineBackend();
+        static constexpr int flat_plane_size = 30;
+        std::vector<std::vector<float>> vertices;
+
+        EngineBackend(): vertices(flat_plane_size, std::vector<float>(flat_plane_size)){};
         bool ConstructConsole();
 
         // Signal handler function
@@ -139,6 +146,11 @@ int QuantizeChannel(int value, int levels);
         int Sample_PNG(float u , float v);
         void generate_3d_plane();
         void generate_perlin();
+        vector2 randomGradient(int ix, int iy);
+        float dotGridGradient(int ix, int iy, float x, float y);
+        float perlin(float x, float y);
+        float interpolate(float a0, float a1, float w);
+
         
     protected:
         int screen_width;
@@ -164,6 +176,5 @@ int QuantizeChannel(int value, int levels);
         cv::Mat image;
         std::unordered_map<uint32_t, int> color_cache; // RGB -> color_pair_id
         int next_color_id = 10;
-        int32_t* pixels;
 
 };

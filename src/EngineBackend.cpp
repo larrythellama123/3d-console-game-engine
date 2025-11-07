@@ -3,7 +3,7 @@
 //issues:
 // triangles drawn behind other triangles
 //depth buffer - z depth of plane if there is another 
-EngineBackend::EngineBackend(){};
+// EngineBackend::EngineBackend(){};
 
 
 bool EngineBackend::ConstructConsole(){
@@ -165,7 +165,7 @@ bool EngineBackend::ConstructConsole(){
             int color_pair = 0;
             
             // Since illum is {0,0,0} in view space, light direction is just negative vertex position
-            vec3D light_dir = {-a.vertices[0].x, -a.vertices[0].y, -a.vertices[0].z};
+            vec3D light_dir = {illum.x-a.vertices[0].x, illum.y-a.vertices[0].y, illum.z-a.vertices[0].z};
             
             // Normalize light direction
             float light_magnitude = sqrtf(light_dir.x * light_dir.x + light_dir.y * light_dir.y + light_dir.z * light_dir.z);
@@ -201,7 +201,7 @@ bool EngineBackend::ConstructConsole(){
             auto EdgeFunction = [](vec3D a, vec3D b, vec3D p) -> int { return (p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x); };
 
 
-            int color_pair = std::max(3,Illumination_calculation(normal, illum, t));
+            int color_pair = std::max(1,Illumination_calculation(normal, illum, t));
 
 
             // For triangle with vertices A, B, C (counter-clockwise)
@@ -247,7 +247,8 @@ bool EngineBackend::ConstructConsole(){
 
                         if(depth_buffer[y*screen_width+x]>depth){
                             depth_buffer[y*screen_width+x]=depth;
-                            color_buffer[y*screen_width+x] = Sample_PNG(u,v);
+                            // color_buffer[y*screen_width+x] = Sample_PNG(u,v);
+                            color_buffer[y*screen_width+x] = color_pair;
                         }
                     }
                 }   
@@ -457,8 +458,6 @@ bool EngineBackend::ConstructConsole(){
 
 
                             triangle tri = {vertice_data[idx1], vertice_data[idx2], vertice_data[idx3]};
-                            std::cout<<"bdvfd ";
-                            
                             triangle_data.push_back(tri);
 
                         } else {
@@ -1163,7 +1162,48 @@ bool EngineBackend::ConstructConsole(){
             return (value * (levels - 1)) / 255;
         }
 
-        void EngineBackend::perlin(float x, float y){
+        vector2 EngineBackend::randomGradient(int ix, int iy) {
+            // No precomputed gradients mean this works for any number of grid coordinates
+            const unsigned w = 8 * sizeof(unsigned);
+            const unsigned s = w / 2; 
+            unsigned a = ix, b = iy;
+            a *= 3284157443;
+        
+            b ^= a << s | a >> w - s;
+            b *= 1911520717;
+        
+            a ^= b << s | b >> w - s;
+            a *= 2048419325;
+            float random = a * (3.14159265 / ~(~0u >> 1)); // in [0, 2*Pi]
+            
+            // Create the vector from the angle
+            vector2 v;
+            v.x = sin(random);
+            v.y = cos(random);
+        
+            return v;
+        }
+ 
+
+        float EngineBackend::dotGridGradient(int ix, int iy, float x, float y) {
+            // Get gradient from integer coordinates
+            vector2 gradient = randomGradient(ix, iy);
+        
+            // Compute the distance vector
+            float dx = x - (float)ix;
+            float dy = y - (float)iy;
+        
+            // Compute the dot-product
+            return (dx * gradient.x + dy * gradient.y);
+        }
+        
+
+        float EngineBackend::interpolate(float a0, float a1, float w)
+        {
+            return (a1 - a0) * (3.0 - w * 2.0) * w * w + a0;
+        }
+
+        float EngineBackend::perlin(float x, float y){
             //all init with 0
             float x1 = std::ceil(x);
             float y1 = std::ceil(y);
@@ -1171,20 +1211,36 @@ bool EngineBackend::ConstructConsole(){
             float y0 = std::floor(y);
 
             //interpolate 
+            // Compute Interpolation weights
+            float sx = x - (float)x0;
+            float sy = y - (float)y0;
+            
+            // Compute and interpolate top two corners
+            float n0 = dotGridGradient(x0, y0, x, y);
+            float n1 = dotGridGradient(x1, y0, x, y);
+            float ix0 = interpolate(n0, n1, sx);
+        
+            // Compute and interpolate bottom two corners
+            n0 = dotGridGradient(x0, y1, x, y);
+            n1 = dotGridGradient(x1, y1, x, y);
+            float ix1 = interpolate(n0, n1, sx);
+        
+            // Final step: interpolate between the two previously interpolated values, now in y
+            float value = interpolate(ix0, ix1, sy);
+            
+            return value;
         }
 
 
         void EngineBackend::generate_perlin(){
 
             //4 channelss for alpha rgb; alpha to control transparency
-            // int32_t* pixels = new int32_t[screen_width * screen_height];
-            
             const int GRID_SIZE = 400;
-            for (int x = 0; x < screen_width; x++)
+            for (int x = 0; x < flat_plane_size; x++)
             {
-                for (int y = 0; y < screen_height; y++)
+                for (int y = 0; y < flat_plane_size; y++)
                 {
-                    int index = (y * screen_width + x) * 4;
+                    int index = (y * flat_plane_size + x) * 4;
         
                     
                     float val = 0;
@@ -1210,39 +1266,13 @@ bool EngineBackend::ConstructConsole(){
                     }else if(val > 1.0){
                         val = 1.0f;
                     }
-
-                    // //decide height first then color
-                    // int height = (int)((val + 1.0f) * 127.5f);
-                    
                     //this will count as the height
-                    pixels[index] = val; 
+                    vertices[x][y] = 200 * val; 
                 }
             }
         }
 
 
-        // void EngineBackend::generate_3d_plane(){
-        //     std::ofstream outputFile("flat_plane.obj");
-        //     for(int i =0; i< 30; i++){
-        //         for(int j=0; j < 30; j++){
-        //             if (outputFile.is_open()) {
-        //                 // outputFile<<"v"<<" "<<i<<" "<<j<<" "<<pixels[i*300+j];
-        //                 outputFile<<"v"<<" "<<i<<" "<<0<<" "<<j<<std::endl;
-
-        //                 if(i-1>=0){
-        //                     if(j%2==0){
-        //                         outputFile<<"f"<<" "<<(i*30 + j)+1 <<" "<<((i-1)*30 + j)+1<<" "<<((i-1)*30 + j+1)+1<<std::endl;
-        //                     }
-        //                     else{
-        //                         outputFile<<"f"<<" "<<(i*30 + j )+1<<" "<<(i*30 + j-1)+1<<" "<<((i-1)*30 + j)+1<<std::endl;
-        //                     }
-        //                 }
-        //             } else {
-        //                 std::cerr << "Error opening file!" << std::endl;
-        //             }
-        //         }
-        //     }
-        // }
         void EngineBackend::generate_3d_plane(){
             std::ofstream outputFile("flat_plane.obj");
             
@@ -1252,9 +1282,9 @@ bool EngineBackend::ConstructConsole(){
             }
             
             // Generate vertices - KEEP THE SPACES!
-            for(int i = 0; i < 30; i++){
-                for(int j = 0; j < 30; j++){
-                    outputFile << "v " << i << " " << 0 << " " << j << std::endl;
+            for(int i = 0; i < flat_plane_size; i++){
+                for(int j = 0; j < flat_plane_size; j++){
+                    outputFile << "v " << i << " " << vertices[i][j] << " " << j << std::endl;
                 }
             }
             
