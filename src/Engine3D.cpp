@@ -7,8 +7,11 @@ class Engine3D: public EngineBackend{
     public:
         Engine3D(){};
         bool OnUserCreate() override{
+            generate_perlin();
+            generate_3d_plane();
 
-            mesh.tris = Read_File("../cottage_obj.obj");
+            mesh.tris = Read_File("../build/flat_plane.obj");
+
 
             // mesh.tris = {
             //     // SOUTH
@@ -163,12 +166,13 @@ class Engine3D: public EngineBackend{
                     std::deque<triangle> listTriangles;
                     int nNewTriangles = 1;
                     listTriangles.push_back(triProjected);
-
+                    
                     for (int p = 0; p < 4; p++)
                     {
                         int nTrisToAdd = 0;
                         while (nNewTriangles > 0)
                         {
+
                             // Take triangle from front of queue
                             triangle test = listTriangles.front();
                             listTriangles.pop_front();
@@ -247,14 +251,10 @@ class Engine3D: public EngineBackend{
                 if ((char)ch == 'l') {
                     fPitch -= 100.0f* fElapsedTime;
                 }
-
-                
             }
-
-
-
-            // refresh();
-            // clear();
+            illumination.y = camera.y;
+            illumination.x = camera.x;
+            illumination.z = camera.z;
             return true;
         }
 
@@ -265,9 +265,9 @@ class Engine3D: public EngineBackend{
         float fTheta;
         vec3D illumination=  { 0.0f, 1.0f, -1.0f };
         vec3D normal;
-        vec3D vlookDir = {0.0f, 0.0f, 1.0f};
+        vec3D vlookDir = {0.0f, -2.0f, 1.0f};
         vec3D vup = {0.0f,1.0f,0.0f};
-        vec3D camera = {0.0f,0.0f, 0.0f} ;
+        vec3D camera = {0.0f,-1.0f, 0.0f} ;
         float fYaw = 0;
         float fPitch = 0;
 
